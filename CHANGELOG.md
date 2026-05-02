@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.6.1] — 2026-05-02
+
+Patch release — no code changes. Re-tag to refresh module proxy cache after
+vanity URL migration to `forge-cms.dev`.
+
+---
+
 ## [1.6.0] — 2026-04-30
 
 Go 1.26.2 and module path migration to `forge-cms.dev` (Amendment A76).
