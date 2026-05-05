@@ -131,6 +131,69 @@ func (s *Server) handleResourceMethod(ctx forge.Context, req jsonRPCRequest) (js
 			return jsonRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: rpcErr}, true
 		}
 		return jsonRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}, true
+	case "resources/subscribe":
+		result, rpcErr := s.handleResourcesSubscribe(ctx, req.Params)
+		if rpcErr != nil {
+			return jsonRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: rpcErr}, true
+		}
+		return jsonRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}, true
+	case "resources/unsubscribe":
+		result, rpcErr := s.handleResourcesUnsubscribe(ctx, req.Params)
+		if rpcErr != nil {
+			return jsonRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: rpcErr}, true
+		}
+		return jsonRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}, true
 	}
 	return jsonRPCResponse{}, false
+}
+
+// handleResourcesSubscribe registers a subscription for the given URI on behalf
+// of the calling SSE session. The session ID is read from the request's
+// session_id query parameter. No-ops silently when the subscriptions registry
+// is nil or no session_id is present.
+func (s *Server) handleResourcesSubscribe(ctx forge.Context, params json.RawMessage) (any, *jsonRPCError) {
+	var p struct {
+		URI string `json:"uri"`
+	}
+	if len(params) > 0 {
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, &jsonRPCError{Code: -32602, Message: "invalid params: " + err.Error()}
+		}
+	}
+	if p.URI == "" {
+		return nil, &jsonRPCError{Code: -32602, Message: "invalid params: uri required"}
+	}
+	if s.subscriptions != nil {
+		if r := ctx.Request(); r != nil {
+			if sid := r.URL.Query().Get("session_id"); sid != "" {
+				s.subscriptions.Register(sid, p.URI)
+			}
+		}
+	}
+	return map[string]any{}, nil
+}
+
+// handleResourcesUnsubscribe removes a subscription for the given URI from the
+// calling SSE session. The session ID is read from the request's session_id
+// query parameter. No-ops silently when the registry is nil or session_id absent.
+func (s *Server) handleResourcesUnsubscribe(ctx forge.Context, params json.RawMessage) (any, *jsonRPCError) {
+	var p struct {
+		URI string `json:"uri"`
+	}
+	if len(params) > 0 {
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, &jsonRPCError{Code: -32602, Message: "invalid params: " + err.Error()}
+		}
+	}
+	if p.URI == "" {
+		return nil, &jsonRPCError{Code: -32602, Message: "invalid params: uri required"}
+	}
+	if s.subscriptions != nil {
+		if r := ctx.Request(); r != nil {
+			if sid := r.URL.Query().Get("session_id"); sid != "" {
+				s.subscriptions.Unsubscribe(sid, p.URI)
+			}
+		}
+	}
+	return map[string]any{}, nil
 }

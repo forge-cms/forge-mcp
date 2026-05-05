@@ -119,6 +119,9 @@ func (s *Server) handleToolsList() any {
 	if s.navTree != nil {
 		tools = append(tools, navToolDefs(s.navTree.HasDB())...)
 	}
+	if s.webhookStore != nil {
+		tools = append(tools, webhookToolDefs()...)
+	}
 	return map[string]any{"tools": tools}
 }
 
@@ -175,6 +178,19 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 			}
 			return s.handleNavTool(ctx, p.Name, navArgs)
 		}
+	}
+
+	// Webhook admin tools require Admin role and are dispatched before
+	// module-scoped tool authorisation.
+	if s.webhookStore != nil && isWebhookTool(p.Name) {
+		if rpcErr := s.authoriseAdmin(ctx); rpcErr != nil {
+			return nil, rpcErr
+		}
+		webhookArgs := p.Arguments
+		if webhookArgs == nil {
+			webhookArgs = map[string]any{}
+		}
+		return s.handleWebhookTool(ctx, p.Name, webhookArgs)
 	}
 
 	if rpcErr := s.authorise(ctx); rpcErr != nil {

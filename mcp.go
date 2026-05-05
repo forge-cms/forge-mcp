@@ -39,10 +39,13 @@ func WithModule(m forge.MCPModule) ServerOption {
 // Server wraps a set of [forge.MCPModule] values and serves the MCP protocol
 // over stdio (see [Server.ServeStdio]) or HTTP SSE (see [Server.Handler]).
 type Server struct {
-	modules    []forge.MCPModule
-	secret     []byte            // HMAC secret for SSE bearer-token verification
-	tokenStore *forge.TokenStore // non-nil when the app has a TokenStore configured
-	navTree    *forge.NavTree    // non-nil when the app has a NavTree configured
+	modules       []forge.MCPModule
+	secret        []byte                // HMAC secret for SSE bearer-token verification
+	tokenStore    *forge.TokenStore     // non-nil when the app has a TokenStore configured
+	navTree       *forge.NavTree        // non-nil when the app has a NavTree configured
+	webhookStore  *forge.WebhookStore   // non-nil when the app has Webhooks configured
+	webhookPool   forge.WebhookJobQueue // non-nil when the app has Webhooks configured
+	subscriptions *subscriptionRegistry // resource subscription fan-out registry
 }
 
 // New creates a Server for the given forge App, collecting all content modules
@@ -51,10 +54,13 @@ type Server struct {
 // Pass [WithSecret] to override (e.g. during secret rotation).
 func New(app *forge.App, opts ...ServerOption) *Server {
 	s := &Server{
-		modules:    app.MCPModules(),
-		secret:     app.Secret(),
-		tokenStore: app.TokenStore(),
-		navTree:    app.NavTree(),
+		modules:       app.MCPModules(),
+		secret:        app.Secret(),
+		tokenStore:    app.TokenStore(),
+		navTree:       app.NavTree(),
+		webhookStore:  app.WebhookStore(),
+		webhookPool:   app.WebhookPool(),
+		subscriptions: newSubscriptionRegistry(),
 	}
 	for _, o := range opts {
 		o(s)
@@ -63,6 +69,24 @@ func New(app *forge.App, opts ...ServerOption) *Server {
 		log.Printf("forge-mcp: WithSecret value differs from app Config.Secret — " +
 			"tokens minted by forge.SignToken will fail SSE verification")
 	}
+	// Bridge app-level signals to resource-subscription notifications.
+	// For each delivery signal, find the module that owns the content type
+	// and construct the resource URI from the prefix and item slug.
+	subs := s.subscriptions
+	app.AddSignalListener(func(sig forge.Signal, typeName string, item any) {
+		for _, m := range s.modules {
+			if m.MCPMeta().TypeName != typeName {
+				continue
+			}
+			slug := slugOf(item)
+			if slug == "" {
+				return
+			}
+			uri := "forge:/" + m.MCPMeta().Prefix + "/" + slug
+			subs.Notify(uri)
+			return
+		}
+	})
 	return s
 }
 
@@ -363,7 +387,7 @@ func (s *Server) handleInitialize() any {
 		"protocolVersion": "2024-11-05",
 		"serverInfo":      map[string]any{"name": "forge-mcp", "version": "1.0.0"},
 		"capabilities": map[string]any{
-			"resources": map[string]any{"subscribe": false, "listChanged": false},
+			"resources": map[string]any{"subscribe": true, "listChanged": true},
 			"tools":     map[string]any{"listChanged": false},
 		},
 	}

@@ -94,17 +94,56 @@ func (s *Server) Handler() http.Handler {
 }
 
 // sseHandler handles GET /mcp, upgrading the HTTP connection to a Server-Sent
-// Events stream. It sends an initial "event: open" keepalive and then blocks
-// until the client disconnects or the request context is cancelled.
+// Events stream. It:
+//  1. Sends an initial "event: open" keepalive for backward compatibility.
+//  2. Generates a unique session ID and registers a send function with the
+//     subscription registry so that resource-update notifications can be
+//     pushed over this stream.
+//  3. Sends "event: endpoint\ndata: /mcp/message?session_id=<id>\n\n" so the
+//     client knows which URL to include when calling POST /mcp/message.
+//  4. Blocks in a select loop, writing resource notifications until the client
+//     disconnects or the request context is cancelled.
+//  5. Calls RemoveConn on disconnect to release the registry entry.
 func (s *Server) sseHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+
+	// Send initial keepalive event (backward-compatible with existing clients).
 	fmt.Fprint(w, "event: open\ndata: {}\n\n")
+
+	// Allocate a session and register the send function before announcing the
+	// endpoint URL. This ensures no notifications are dropped between the
+	// endpoint announcement and the client's first subscribe call.
+	sessionID := newSessionID()
+	notifCh := make(chan string, 32)
+	if s.subscriptions != nil {
+		s.subscriptions.RegisterSend(sessionID, func(uri string) {
+			select {
+			case notifCh <- buildNotifyEvent(uri):
+			default: // drop if the channel is full; slow consumers miss stale notifications
+			}
+		})
+		defer s.subscriptions.RemoveConn(sessionID)
+	}
+
+	// Announce the session-scoped message endpoint to the client.
+	fmt.Fprintf(w, "event: endpoint\ndata: /mcp/message?session_id=%s\n\n", sessionID)
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
-	<-r.Context().Done()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case event := <-notifCh:
+			fmt.Fprint(w, event)
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+	}
 }
 
 // messageHandler handles POST /mcp/message. It enforces the authentication

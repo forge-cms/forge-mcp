@@ -7,6 +7,31 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.7.0] — 2026-05-08
+
+Outbound webhook MCP tools and MCP resource subscriptions (Milestone 11).
+
+### Added
+
+- `webhook_tools.go`: 5 new Admin-role MCP tools — `create_webhook`,
+  `list_webhooks`, `delete_webhook`, `list_webhook_deliveries`, `retry_webhook`.
+  All require Admin role. `create_webhook` validates HTTPS URLs server-side
+  (SSRF protection). Signing secrets are returned once at creation.
+- `subscription.go`: `subscriptionRegistry` — session-keyed fan-out registry
+  for SSE push notifications. `buildNotifyEvent`, `newSessionID`.
+- `mcp.go`: `subscriptions *subscriptionRegistry` field; `New()` wires a
+  signal listener that calls `subscriptions.Notify(uri)` on content changes;
+  `handleInitialize` now returns `"resources": {"subscribe": true, "listChanged": true}`.
+- `transport.go`: SSE transport assigns a per-connection session ID; sends
+  `event: endpoint` with the session-scoped message URL; notification loop
+  forwards `notifications/resources/updated` events to subscribed clients.
+- `resource.go`: `handleResourceMethod` routes `resources/subscribe` and
+  `resources/unsubscribe` JSON-RPC methods.
+- `subscription_test.go`: 6 unit tests for the subscription registry.
+- `tool.go`: webhook tool dispatch wired into `handleToolsList` and `handleToolsCall`.
+
+---
+
 ## [1.6.1] — 2026-05-02
 
 Patch release — no code changes. Re-tag to refresh module proxy cache after
