@@ -122,6 +122,7 @@ func (s *Server) handleToolsList() any {
 	if s.webhookStore != nil {
 		tools = append(tools, webhookToolDefs()...)
 	}
+	tools = append(tools, previewToolDefs()...)
 	return map[string]any{"tools": tools}
 }
 
@@ -191,6 +192,19 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 			webhookArgs = map[string]any{}
 		}
 		return s.handleWebhookTool(ctx, p.Name, webhookArgs)
+	}
+
+	// Preview URL tool requires Admin role and is dispatched before
+	// module-scoped tool authorisation.
+	if isPreviewTool(p.Name) {
+		if rpcErr := s.authoriseAdmin(ctx); rpcErr != nil {
+			return nil, rpcErr
+		}
+		previewArgs := p.Arguments
+		if previewArgs == nil {
+			previewArgs = map[string]any{}
+		}
+		return s.handlePreviewTool(s.app, p.Name, previewArgs)
 	}
 
 	if rpcErr := s.authorise(ctx); rpcErr != nil {
