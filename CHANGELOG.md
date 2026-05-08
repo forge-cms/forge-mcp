@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.8.1] — 2026-05-08
+
+Patch release — no code changes. Re-tag to refresh module proxy cache after
+`go.mod` was updated to require `forge-cms.dev/forge v1.18.0` (was v1.14.1).
+
+---
+
 ## [1.8.0] — 2026-05-08
 
 Draft preview URL tool (Milestone 12, Amendment A92).
