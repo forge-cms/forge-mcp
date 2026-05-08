@@ -7,6 +7,26 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.8.0] — 2026-05-08
+
+Draft preview URL tool (Milestone 12, Amendment A92).
+
+### Added
+
+- `create_preview_url` MCP tool (Admin role) — takes `prefix` (e.g. `/posts`)
+  and `slug`; returns the full signed preview URL. The URL grants read access
+  to Draft or Scheduled content for the token lifetime (default 12 h). Archived
+  items are never previewable regardless of token validity.
+- `preview_tools.go`: tool definition, validation, and dispatch.
+- `Server.app` field: stores the `*forge.App` reference for `BaseURL()` and
+  `GeneratePreviewToken()` calls; set in `New`.
+
+### Changed
+
+- `tools/list` always includes `create_preview_url` (not gated on a store).
+
+---
+
 ## [1.7.0] — 2026-05-08
 
 Outbound webhook MCP tools and MCP resource subscriptions (Milestone 11).
