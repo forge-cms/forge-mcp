@@ -7,6 +7,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.9.0] — 2026-05-09
+
+Upload token MCP tool (Milestone 13, Amendment A93).
+
+### Added
+
+- `create_upload_token` MCP tool (Author+ role) — takes no parameters; returns
+  `{ token, upload_url, expires_in }`. The token is passed to `POST /media` as
+  `Authorization: UploadToken <token>`. UploadToken uploads are restricted to image
+  MIME types by forge-media.
+- `upload_tools.go`: tool definition, dispatch, and `handleUploadTool`.
+- `tool.go`: `uploadToolDefs()` always appended in `handleToolsList` (not gated on
+  a store); `isUploadTool` dispatch block in `handleToolsCall` (Author gate).
+
+---
+
 ## [1.8.1] — 2026-05-08
 
 Patch release — no code changes. Re-tag to refresh module proxy cache after
