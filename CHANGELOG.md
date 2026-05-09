@@ -7,6 +7,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.9.2] — 2026-05-09
+
+Patch release — no code changes. Re-tag to refresh module proxy cache after
+v1.9.1 was cached with an incorrect module declaration in `go.mod`.
+
+---
+
+## [1.9.1] — 2026-05-09
+
+Patch release — no code changes. Bumps forge dependency from v1.18.0 to v1.19.0
+in go.mod so the module proxy serves the correct dependency graph.
+
+---
+
 ## [1.9.0] — 2026-05-09
 
 Upload token MCP tool (Milestone 13, Amendment A93).
