@@ -123,6 +123,7 @@ func (s *Server) handleToolsList() any {
 		tools = append(tools, webhookToolDefs()...)
 	}
 	tools = append(tools, previewToolDefs()...)
+	tools = append(tools, uploadToolDefs()...)
 	return map[string]any{"tools": tools}
 }
 
@@ -205,6 +206,15 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 			previewArgs = map[string]any{}
 		}
 		return s.handlePreviewTool(s.app, p.Name, previewArgs)
+	}
+
+	// Upload token tool requires Author role and is dispatched before
+	// module-scoped tool authorisation.
+	if isUploadTool(p.Name) {
+		if rpcErr := s.authorise(ctx); rpcErr != nil {
+			return nil, rpcErr
+		}
+		return s.handleUploadTool(s.app, p.Name)
 	}
 
 	if rpcErr := s.authorise(ctx); rpcErr != nil {
