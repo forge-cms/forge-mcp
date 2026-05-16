@@ -136,19 +136,51 @@ func (s *Server) allResources(ctx forge.Context) []mcpResource {
 	return out
 }
 
+// slugOnlySchema is the JSON Schema for tools that require only a slug argument.
+var slugOnlySchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"slug": map[string]any{"type": "string"},
+	},
+	"required": []string{"slug"},
+}
+
+// fieldToProp converts a single MCPField to its JSON Schema property object.
+func fieldToProp(f forge.MCPField) map[string]any {
+	var prop map[string]any
+	switch f.Type {
+	case "array":
+		prop = map[string]any{
+			"type":  "array",
+			"items": map[string]any{"type": "string"},
+		}
+	case "datetime":
+		// "datetime" is an internal Forge type identifier. JSON Schema
+		// requires the RFC 3339 date-time format expressed as a string.
+		prop = map[string]any{"type": "string", "format": "date-time"}
+	default:
+		prop = map[string]any{"type": f.Type}
+		if f.MinLength > 0 {
+			prop["minLength"] = f.MinLength
+		}
+		if f.MaxLength > 0 {
+			prop["maxLength"] = f.MaxLength
+		}
+		if len(f.Enum) > 0 {
+			prop["enum"] = f.Enum
+		}
+	}
+	if desc := fieldDescription(f); desc != "" {
+		prop["description"] = desc
+	}
+	return prop
+}
+
 // mcpToolDefs returns the tool definitions for a module that has MCPWrite.
 func mcpToolDefs(m forge.MCPModule) []mcpTool {
 	meta := m.MCPMeta()
 	typeSnake := snakeCase(meta.TypeName)
 	schema := m.MCPSchema()
-
-	slugOnly := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"slug": map[string]any{"type": "string"},
-		},
-		"required": []string{"slug"},
-	}
 
 	return []mcpTool{
 		{
@@ -164,7 +196,7 @@ func mcpToolDefs(m forge.MCPModule) []mcpTool {
 		{
 			Name:        "publish_" + typeSnake,
 			Description: "Publish a " + meta.TypeName + " by slug.",
-			InputSchema: slugOnly,
+			InputSchema: slugOnlySchema,
 		},
 		{
 			Name:        "schedule_" + typeSnake,
@@ -181,7 +213,7 @@ func mcpToolDefs(m forge.MCPModule) []mcpTool {
 		{
 			Name:        "archive_" + typeSnake,
 			Description: "Archive a " + meta.TypeName + " by slug.",
-			InputSchema: slugOnly,
+			InputSchema: slugOnlySchema,
 		},
 	}
 }
@@ -199,13 +231,6 @@ func mcpToolDefs(m forge.MCPModule) []mcpTool {
 func mcpAdminReadToolDefs(m forge.MCPModule) []mcpTool {
 	meta := m.MCPMeta()
 	typeSnake := snakeCase(meta.TypeName)
-	slugOnly := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"slug": map[string]any{"type": "string"},
-		},
-		"required": []string{"slug"},
-	}
 	return []mcpTool{
 		{
 			Name:        "list_" + typeSnake + "s",
@@ -235,7 +260,7 @@ func mcpAdminReadToolDefs(m forge.MCPModule) []mcpTool {
 		{
 			Name:        "delete_" + typeSnake,
 			Description: "Delete a " + meta.TypeName + " permanently. Requires Editor or Admin role.",
-			InputSchema: slugOnly,
+			InputSchema: slugOnlySchema,
 		},
 	}
 }
@@ -252,33 +277,7 @@ func inputSchema(fields []forge.MCPField) map[string]any {
 	props := make(map[string]any, len(fields))
 	var required []string
 	for _, f := range fields {
-		var prop map[string]any
-		switch f.Type {
-		case "array":
-			prop = map[string]any{
-				"type":  "array",
-				"items": map[string]any{"type": "string"},
-			}
-		case "datetime":
-			// "datetime" is an internal Forge type identifier. JSON Schema
-			// requires the RFC 3339 date-time format expressed as a string.
-			prop = map[string]any{"type": "string", "format": "date-time"}
-		default:
-			prop = map[string]any{"type": f.Type}
-			if f.MinLength > 0 {
-				prop["minLength"] = f.MinLength
-			}
-			if f.MaxLength > 0 {
-				prop["maxLength"] = f.MaxLength
-			}
-			if len(f.Enum) > 0 {
-				prop["enum"] = f.Enum
-			}
-		}
-		if desc := fieldDescription(f); desc != "" {
-			prop["description"] = desc
-		}
-		props[f.JSONName] = prop
+		props[f.JSONName] = fieldToProp(f)
 		if f.Required {
 			required = append(required, f.JSONName)
 		}
@@ -302,33 +301,7 @@ func inputSchemaUpdate(fields []forge.MCPField) map[string]any {
 		"slug": map[string]any{"type": "string"},
 	}
 	for _, f := range fields {
-		var prop map[string]any
-		switch f.Type {
-		case "array":
-			prop = map[string]any{
-				"type":  "array",
-				"items": map[string]any{"type": "string"},
-			}
-		case "datetime":
-			// "datetime" is an internal Forge type identifier. JSON Schema
-			// requires the RFC 3339 date-time format expressed as a string.
-			prop = map[string]any{"type": "string", "format": "date-time"}
-		default:
-			prop = map[string]any{"type": f.Type}
-			if f.MinLength > 0 {
-				prop["minLength"] = f.MinLength
-			}
-			if f.MaxLength > 0 {
-				prop["maxLength"] = f.MaxLength
-			}
-			if len(f.Enum) > 0 {
-				prop["enum"] = f.Enum
-			}
-		}
-		if desc := fieldDescription(f); desc != "" {
-			prop["description"] = desc
-		}
-		props[f.JSONName] = prop
+		props[f.JSONName] = fieldToProp(f)
 	}
 	return map[string]any{
 		"type":       "object",

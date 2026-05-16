@@ -158,11 +158,7 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 			if rpcErr := s.authoriseAdmin(ctx); rpcErr != nil {
 				return nil, rpcErr
 			}
-			args := p.Arguments
-			if args == nil {
-				args = map[string]any{}
-			}
-			return s.handleTokenTool(ctx, p.Name, args)
+			return s.handleTokenTool(ctx, p.Name, coalesceArgs(p.Arguments))
 		}
 	}
 
@@ -174,11 +170,7 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 			if rpcErr := s.authoriseEditor(ctx); rpcErr != nil {
 				return nil, rpcErr
 			}
-			navArgs := p.Arguments
-			if navArgs == nil {
-				navArgs = map[string]any{}
-			}
-			return s.handleNavTool(ctx, p.Name, navArgs)
+			return s.handleNavTool(ctx, p.Name, coalesceArgs(p.Arguments))
 		}
 	}
 
@@ -188,11 +180,7 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 		if rpcErr := s.authoriseAdmin(ctx); rpcErr != nil {
 			return nil, rpcErr
 		}
-		webhookArgs := p.Arguments
-		if webhookArgs == nil {
-			webhookArgs = map[string]any{}
-		}
-		return s.handleWebhookTool(ctx, p.Name, webhookArgs)
+		return s.handleWebhookTool(ctx, p.Name, coalesceArgs(p.Arguments))
 	}
 
 	// Preview URL tool requires Admin role and is dispatched before
@@ -201,11 +189,7 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 		if rpcErr := s.authoriseAdmin(ctx); rpcErr != nil {
 			return nil, rpcErr
 		}
-		previewArgs := p.Arguments
-		if previewArgs == nil {
-			previewArgs = map[string]any{}
-		}
-		return s.handlePreviewTool(s.app, p.Name, previewArgs)
+		return s.handlePreviewTool(s.app, p.Name, coalesceArgs(p.Arguments))
 	}
 
 	// Upload token tool requires Author role and is dispatched before
@@ -666,6 +650,15 @@ func (s *Server) handleNavTool(ctx forge.Context, name string, args map[string]a
 		return toolResult(map[string]any{"deleted": true, "id": id}), nil
 	}
 	return nil, &jsonRPCError{Code: -32602, Message: "unknown nav tool: " + name}
+}
+
+// coalesceArgs returns m when non-nil, otherwise an empty map. Used to
+// normalise absent MCP arguments before passing to tool handlers.
+func coalesceArgs(m map[string]any) map[string]any {
+	if m == nil {
+		return map[string]any{}
+	}
+	return m
 }
 
 // stringArgOr extracts a string from args under key, returning fallback when

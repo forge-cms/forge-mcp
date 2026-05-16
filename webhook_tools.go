@@ -2,7 +2,6 @@ package forgemcp
 
 import (
 	"fmt"
-	"strings"
 
 	"forge-cms.dev/forge"
 )
@@ -231,7 +230,7 @@ func (s *Server) handleWebhookTool(ctx forge.Context, name string, args map[stri
 
 // isWebhookTool reports whether name is one of the five webhook admin tools.
 func isWebhookTool(name string) bool {
-	return strings.HasPrefix(name, "create_webhook") ||
+	return name == "create_webhook" ||
 		name == "list_webhooks" ||
 		name == "delete_webhook" ||
 		name == "list_webhook_deliveries" ||
