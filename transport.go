@@ -109,9 +109,6 @@ func (s *Server) sseHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	// Send initial keepalive event (backward-compatible with existing clients).
-	fmt.Fprint(w, "event: open\ndata: {}\n\n")
-
 	// Allocate a session and register the send function before announcing the
 	// endpoint URL. This ensures no notifications are dropped between the
 	// endpoint announcement and the client's first subscribe call.

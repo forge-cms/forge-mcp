@@ -1186,8 +1186,12 @@ func TestMCPHandler_SSEOpen(t *testing.T) {
 	if cc := w.Header().Get("Cache-Control"); cc != "no-cache" {
 		t.Errorf("Cache-Control = %q, want no-cache", cc)
 	}
-	if !strings.Contains(w.Body.String(), "event: open") {
-		t.Errorf("body %q does not contain 'event: open'", w.Body.String())
+	body := w.Body.String()
+	if !strings.Contains(body, "event: endpoint") {
+		t.Errorf("body %q does not contain 'event: endpoint'", body)
+	}
+	if strings.Contains(body, "event: open") {
+		t.Errorf("body %q must not contain non-spec 'event: open'", body)
 	}
 }
 

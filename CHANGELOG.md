@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.9.3] — 2026-05-17
+
+### Fixed
+
+- `sseHandler` no longer sends a non-spec `event: open` keepalive before
+  `event: endpoint`. The go-sdk v1.6.0 `SSEClientTransport` expects `endpoint`
+  as the first SSE event per the MCP SSE spec; the `open` event caused
+  forge-agent connections to fail with "missing endpoint: first event is open".
+
+---
+
 ## [1.9.2] — 2026-05-09
 
 Patch release — no code changes. Re-tag to refresh module proxy cache after
