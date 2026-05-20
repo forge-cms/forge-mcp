@@ -1702,3 +1702,79 @@ func TestTokenToolRevokeToken(t *testing.T) {
 		t.Errorf("expected revoked=true, got %v", fields["revoked"])
 	}
 }
+
+// testSinglePage is a minimal content type for SingleInstance preview URL tests.
+type testSinglePage struct {
+	forge.Node
+	Title string `forge:"required"`
+}
+
+// TestPreviewURL_SingleInstance verifies that create_preview_url returns a
+// path without a slug segment for SingleInstance modules.
+func TestPreviewURL_SingleInstance(t *testing.T) {
+	cfg := forge.Config{
+		BaseURL: "http://localhost",
+		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
+	}
+	app := forge.New(cfg)
+	repo := forge.NewMemoryRepo[*testSinglePage]()
+
+	// SingleInstance module at /homepage.
+	app.Content(forge.NewModule(
+		(*testSinglePage)(nil),
+		forge.At("/homepage"),
+		forge.Repo(repo),
+		forge.MCP(forge.MCPRead, forge.MCPWrite),
+		forge.SingleInstance(),
+	))
+	// Normal module at /posts for the unchanged-path assertion.
+	app.Content(forge.NewModule(
+		(*testMCPPost)(nil),
+		forge.At("/posts"),
+		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
+		forge.MCP(forge.MCPRead, forge.MCPWrite),
+	))
+
+	srv := New(app)
+
+	t.Run("single_instance_no_slug_in_path", func(t *testing.T) {
+		result, rpcErr := srv.handlePreviewTool(app, "create_preview_url", map[string]any{
+			"prefix": "/homepage",
+			"slug":   "homepage",
+		})
+		if rpcErr != nil {
+			t.Fatalf("unexpected error: %+v", rpcErr)
+		}
+		res, _ := result.(map[string]any)
+		contents, _ := res["content"].([]map[string]any)
+		if len(contents) == 0 {
+			t.Fatal("empty content in result")
+		}
+		url := strings.Trim(contents[0]["text"].(string), `"`)
+		if strings.Contains(url, "/homepage/homepage") {
+			t.Errorf("SingleInstance preview URL must not contain slug segment: %s", url)
+		}
+		if !strings.HasPrefix(url, "http://localhost/homepage?preview=") {
+			t.Errorf("SingleInstance preview URL = %q, want prefix http://localhost/homepage?preview=", url)
+		}
+	})
+
+	t.Run("normal_module_keeps_slug_in_path", func(t *testing.T) {
+		result, rpcErr := srv.handlePreviewTool(app, "create_preview_url", map[string]any{
+			"prefix": "/posts",
+			"slug":   "my-draft",
+		})
+		if rpcErr != nil {
+			t.Fatalf("unexpected error: %+v", rpcErr)
+		}
+		res, _ := result.(map[string]any)
+		contents, _ := res["content"].([]map[string]any)
+		if len(contents) == 0 {
+			t.Fatal("empty content in result")
+		}
+		url := strings.Trim(contents[0]["text"].(string), `"`)
+		if !strings.HasPrefix(url, "http://localhost/posts/my-draft?preview=") {
+			t.Errorf("normal module preview URL = %q, want prefix http://localhost/posts/my-draft?preview=", url)
+		}
+	})
+}

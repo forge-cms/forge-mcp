@@ -59,7 +59,23 @@ func (s *Server) handlePreviewTool(app *forge.App, name string, args map[string]
 	}
 
 	token := app.GeneratePreviewToken(prefix, slug)
-	previewURL := fmt.Sprintf("%s%s/%s?preview=%s", app.BaseURL(), prefix, slug, token)
+
+	// For SingleInstance modules, the slug route does not exist — the item is
+	// served directly at /{prefix}. Build the URL without the slug segment.
+	isSingleInstance := false
+	for _, m := range s.modules {
+		if m.MCPMeta().Prefix == prefix {
+			isSingleInstance = m.MCPMeta().SingleInstance
+			break
+		}
+	}
+
+	var previewURL string
+	if isSingleInstance {
+		previewURL = fmt.Sprintf("%s%s?preview=%s", app.BaseURL(), prefix, token)
+	} else {
+		previewURL = fmt.Sprintf("%s%s/%s?preview=%s", app.BaseURL(), prefix, slug, token)
+	}
 
 	return toolResult(previewURL), nil
 }

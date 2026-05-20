@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.10.2] — 2026-05-20
+
+### Fixed
+
+- `preview_tools.go`: `create_preview_url` now returns `{baseURL}/{prefix}?preview={token}`
+  for SingleInstance modules. Previously it always appended `/{slug}` to the path, which
+  returned 404 for SingleInstance modules where the slug route is not registered.
+  Normal modules are unaffected.
+
+---
+
 ## [1.10.1] — 2026-05-20
 
 ### Fixed
