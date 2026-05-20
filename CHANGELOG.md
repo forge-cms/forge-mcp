@@ -7,6 +7,24 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.10.0] — 2026-05-23
+
+SingleInstance support: suppress `list_{type}s` admin tool (Amendment A101).
+
+### Changed
+
+- `mcpAdminReadToolDefs`: when `MCPMeta.SingleInstance` is `true`, the
+  `list_{type}s` tool is omitted from the generated admin tool set. A
+  single-instance module has at most one item — `get_{type}` is sufficient
+  for content management. The `get_{type}` and `delete_{type}` tools are
+  always generated.
+
+### Requires
+
+- `forge-cms.dev/forge` ≥ v1.23.0 (for `MCPMeta.SingleInstance`).
+
+---
+
 ## [1.9.3] — 2026-05-17
 
 ### Fixed

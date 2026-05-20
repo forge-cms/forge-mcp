@@ -221,31 +221,20 @@ func mcpToolDefs(m forge.MCPModule) []mcpTool {
 // mcpAdminReadToolDefs returns the admin tool definitions for a module that
 // has MCPWrite. These tools require Editor or Admin role and bypass the
 // Published-only restriction, making them suitable for content management
-// dashboards and admin AI assistants. Three tools are generated per MCPWrite
-// module:
+// dashboards and admin AI assistants.
 //
-//   - list_{type}s — list all items; optional status filter ("draft",
-//     "scheduled", "published", "archived")
+// For normal modules, three tools are generated:
+//   - list_{type}s — list all items; optional status filter
 //   - get_{type} — fetch a single item by slug regardless of status
 //   - delete_{type} — permanently delete an item by slug
+//
+// For [forge.SingleInstance] modules, the list_{type}s tool is suppressed
+// because the module has at most one item — get_{type} is sufficient.
 func mcpAdminReadToolDefs(m forge.MCPModule) []mcpTool {
 	meta := m.MCPMeta()
 	typeSnake := snakeCase(meta.TypeName)
-	return []mcpTool{
-		{
-			Name:        "list_" + typeSnake + "s",
-			Description: "List all " + meta.TypeName + " items. Requires Editor or Admin role. Returns items at any lifecycle status.",
-			InputSchema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"status": map[string]any{
-						"type":        "string",
-						"enum":        []string{"draft", "scheduled", "published", "archived"},
-						"description": "Filter by lifecycle status. Omit to return all statuses.",
-					},
-				},
-			},
-		},
+
+	getAndDelete := []mcpTool{
 		{
 			Name:        "get_" + typeSnake,
 			Description: "Get a single " + meta.TypeName + " by slug. Requires Editor or Admin role. Returns the item at any lifecycle status.",
@@ -263,6 +252,27 @@ func mcpAdminReadToolDefs(m forge.MCPModule) []mcpTool {
 			InputSchema: slugOnlySchema,
 		},
 	}
+
+	if meta.SingleInstance {
+		// SingleInstance modules have at most one item — list tool is unnecessary.
+		return getAndDelete
+	}
+
+	list := mcpTool{
+		Name:        "list_" + typeSnake + "s",
+		Description: "List all " + meta.TypeName + " items. Requires Editor or Admin role. Returns items at any lifecycle status.",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status": map[string]any{
+					"type":        "string",
+					"enum":        []string{"draft", "scheduled", "published", "archived"},
+					"description": "Filter by lifecycle status. Omit to return all statuses.",
+				},
+			},
+		},
+	}
+	return append([]mcpTool{list}, getAndDelete...)
 }
 
 // inputSchema converts []forge.MCPField to a JSON Schema object suitable for
