@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.10.1] — 2026-05-20
+
+### Fixed
+
+- `go.mod`: bumped `forge-cms.dev/forge` require from v1.19.0 to v1.23.0.
+  v1.10.0 uses `MCPMeta.SingleInstance` (added in forge v1.23.0) but declared
+  the wrong minimum dependency — causing a module mismatch for consumers.
+
+---
+
 ## [1.10.0] — 2026-05-23
 
 SingleInstance support: suppress `list_{type}s` admin tool (Amendment A101).

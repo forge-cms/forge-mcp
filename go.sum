@@ -1,5 +1,5 @@
-forge-cms.dev/forge v1.19.0 h1:bGzXhBYTOmtdT7MOcNuhU+PjOFI1gBjztrnFreGwCmU=
-forge-cms.dev/forge v1.19.0/go.mod h1:4BBbd9RlkrT6OqSLSSBjhsRJb/FB9S1LekuosSd6Q5Y=
+forge-cms.dev/forge v1.23.0 h1:zMTN3c4myIOMZAN1+2anOutrGORQc0b4GcXbxC0l/9U=
+forge-cms.dev/forge v1.23.0/go.mod h1:no4FvP8bEF3tv2rICPdrmK/yhWZ1squRwAV8sqtLPd4=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=

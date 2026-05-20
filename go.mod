@@ -1,5 +1,5 @@
 module forge-cms.dev/forge-mcp
 
-go 1.26.2
+go 1.26.3
 
-require forge-cms.dev/forge v1.19.0
+require forge-cms.dev/forge v1.23.0
