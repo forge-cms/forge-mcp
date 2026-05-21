@@ -7,12 +7,12 @@ import (
 	"forge-cms.dev/forge"
 )
 
-// previewToolDefs returns the single Admin-only preview URL tool definition.
+// previewToolDefs returns the single Editor-or-Admin preview URL tool definition.
 func previewToolDefs() []mcpTool {
 	return []mcpTool{
 		{
 			Name:        "create_preview_url",
-			Description: "Generate a signed preview URL for a draft content item. The URL bypasses the Published-only visibility guard for the token's lifetime (default 12 h). Requires Admin role.",
+			Description: "Generate a signed preview URL for a draft content item. The URL bypasses the Published-only visibility guard for the token's lifetime (default 12 h). Requires Editor or Admin role.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{

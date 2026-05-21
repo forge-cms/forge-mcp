@@ -183,10 +183,10 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 		return s.handleWebhookTool(ctx, p.Name, coalesceArgs(p.Arguments))
 	}
 
-	// Preview URL tool requires Admin role and is dispatched before
+	// Preview URL tool requires Editor role and is dispatched before
 	// module-scoped tool authorisation.
 	if isPreviewTool(p.Name) {
-		if rpcErr := s.authoriseAdmin(ctx); rpcErr != nil {
+		if rpcErr := s.authoriseEditor(ctx); rpcErr != nil {
 			return nil, rpcErr
 		}
 		return s.handlePreviewTool(s.app, p.Name, coalesceArgs(p.Arguments))

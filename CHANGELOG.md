@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.10.3] — 2026-05-21
+
+### Fixed
+
+- `tool.go`: lower `create_preview_url` minimum role from Admin to Editor.
+  Brand and site pilots hold Editor tokens and could not generate preview URLs.
+- `preview_tools.go`: update tool description to reflect "Requires Editor or Admin role."
+
+---
+
 ## [1.10.2] — 2026-05-20
 
 ### Fixed
