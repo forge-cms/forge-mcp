@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"forge-cms.dev/forge"
+	forgeoauth "forge-cms.dev/forge-oauth"
 )
 
 // testMCPPost is the canonical content type for all forge-mcp tests.
@@ -1777,4 +1778,159 @@ func TestPreviewURL_SingleInstance(t *testing.T) {
 			t.Errorf("normal module preview URL = %q, want prefix http://localhost/posts/my-draft?preview=", url)
 		}
 	})
+}
+
+// — Lag 3: forge-mcp OAuth wiring tests ——————————————————————————————————
+
+// newTestOAuthServer builds an in-memory forge-oauth Server for Lag 3 tests.
+// VerifyBearer always returns true — tests don't exercise the bearer flow here;
+// that is covered by Lag 1/2 in forge-oauth.
+func newTestOAuthServer(t *testing.T) (*forgeoauth.Server, *forgeoauth.SQLiteStore) {
+	t.Helper()
+	store, err := forgeoauth.NewSQLiteStore(":memory:")
+	if err != nil {
+		t.Fatalf("NewSQLiteStore: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+	srv := forgeoauth.New(forgeoauth.Config{
+		Issuer:       "https://cms.example.com",
+		VerifyBearer: func(string) bool { return true },
+	}, store)
+	return srv, store
+}
+
+// seedOAuthToken saves a valid (non-expired) access token in the store.
+func seedOAuthToken(t *testing.T, store *forgeoauth.SQLiteStore, token, clientID, scope string) {
+	t.Helper()
+	err := store.SaveToken(context.Background(), forgeoauth.AccessToken{
+		Token:     token,
+		ClientID:  clientID,
+		Scope:     scope,
+		ExpiresAt: time.Now().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("seedOAuthToken: %v", err)
+	}
+}
+
+// TestOAuth_SSE_NoBearer_Returns401 verifies that GET /mcp returns 401 with a
+// WWW-Authenticate header when OAuth is enabled and no Bearer token is present.
+func TestOAuth_SSE_NoBearer_Returns401(t *testing.T) {
+	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	oauthSrv, _ := newTestOAuthServer(t)
+	srv := New(app, WithOAuth(oauthSrv))
+
+	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+	wwwAuth := w.Header().Get("WWW-Authenticate")
+	if !strings.Contains(wwwAuth, "resource_metadata=") {
+		t.Errorf("WWW-Authenticate = %q, want resource_metadata=... present", wwwAuth)
+	}
+}
+
+// TestOAuth_Message_NoBearer_Returns401 verifies that POST /mcp/message returns
+// 401 with a WWW-Authenticate header when OAuth is enabled and no Bearer token
+// is present.
+func TestOAuth_Message_NoBearer_Returns401(t *testing.T) {
+	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	oauthSrv, _ := newTestOAuthServer(t)
+	srv := New(app, WithOAuth(oauthSrv))
+
+	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
+	req := httptest.NewRequest(http.MethodPost, "/mcp/message", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+	wwwAuth := w.Header().Get("WWW-Authenticate")
+	if !strings.Contains(wwwAuth, "resource_metadata=") {
+		t.Errorf("WWW-Authenticate = %q, want resource_metadata=... present", wwwAuth)
+	}
+	if !strings.Contains(wwwAuth, "/.well-known/oauth-protected-resource") {
+		t.Errorf("WWW-Authenticate = %q, want oauth-protected-resource URL", wwwAuth)
+	}
+}
+
+// TestOAuth_ProtectedResourceMetadata verifies that
+// GET /.well-known/oauth-protected-resource returns 200 JSON with the
+// authorization_servers field when OAuth is enabled.
+func TestOAuth_ProtectedResourceMetadata(t *testing.T) {
+	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	oauthSrv, _ := newTestOAuthServer(t)
+	srv := New(app, WithOAuth(oauthSrv))
+
+	req := httptest.NewRequest(http.MethodGet, "/.well-known/oauth-protected-resource", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+	ct := w.Header().Get("Content-Type")
+	if !strings.HasPrefix(ct, "application/json") {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+	var meta map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&meta); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	servers, _ := meta["authorization_servers"].([]any)
+	if len(servers) == 0 {
+		t.Error("authorization_servers is missing or empty")
+	}
+	if servers[0] != "https://cms.example.com" {
+		t.Errorf("authorization_servers[0] = %q, want https://cms.example.com", servers[0])
+	}
+}
+
+// TestOAuth_Message_ValidToken_Returns200 verifies that POST /mcp/message with
+// a valid OAuth access token returns a 200 JSON-RPC response.
+func TestOAuth_Message_ValidToken_Returns200(t *testing.T) {
+	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	oauthSrv, store := newTestOAuthServer(t)
+	seedOAuthToken(t, store, "valid-access-token-001", "https://chatgpt.com", "mcp")
+
+	srv := New(app, WithOAuth(oauthSrv))
+
+	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
+	req := httptest.NewRequest(http.MethodPost, "/mcp/message", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-access-token-001")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	var resp jsonRPCResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Error != nil {
+		t.Errorf("unexpected JSON-RPC error: %+v", resp.Error)
+	}
+}
+
+// TestOAuth_ProtectedResource_NotEnabled_Returns404 verifies that
+// GET /.well-known/oauth-protected-resource returns 404 when OAuth is not
+// configured (WithOAuth was not called).
+func TestOAuth_ProtectedResource_NotEnabled_Returns404(t *testing.T) {
+	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	srv := New(app) // no WithOAuth
+
+	req := httptest.NewRequest(http.MethodGet, "/.well-known/oauth-protected-resource", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", w.Code)
+	}
 }

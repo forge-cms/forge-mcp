@@ -10,6 +10,7 @@ import (
 	"log"
 
 	"forge-cms.dev/forge"
+	forgeoauth "forge-cms.dev/forge-oauth"
 )
 
 // ServerOption configures a [Server]. Use [WithSecret] to override the HMAC
@@ -36,10 +37,39 @@ func WithModule(m forge.MCPModule) ServerOption {
 	return func(s *Server) { s.modules = append(s.modules, m) }
 }
 
+// WithOAuth enables OAuth 2.1 authentication for the MCP server.
+// The provided forge-oauth [forgeoauth.Server] handles authorization and token
+// issuance; all MCP requests (both GET /mcp SSE and POST /mcp/message) must
+// carry a valid OAuth Bearer access token.
+//
+// The OAuth endpoints are served at the same HTTP address as the MCP endpoints.
+// [Server.Handler] mounts:
+//
+//	GET  /.well-known/oauth-authorization-server  (RFC 8414 — served by forge-oauth)
+//	GET  /.well-known/oauth-protected-resource    (RFC 9728 — served by forge-mcp)
+//	GET  /oauth/authorize
+//	POST /oauth/authorize
+//	POST /oauth/token
+//
+// Example:
+//
+//	store, _ := forgeoauth.NewSQLiteStore("./forge-oauth.db")
+//	oauthSrv := forgeoauth.New(forgeoauth.Config{
+//	    Issuer: "https://cms.example.com",
+//	    VerifyBearer: func(token string) bool {
+//	        _, ok := forge.VerifyTokenString(token, app.Secret(), app.TokenStore())
+//	        return ok
+//	    },
+//	}, store)
+//	mcpSrv := forgemcp.New(app, forgemcp.WithOAuth(oauthSrv))
+func WithOAuth(oauth *forgeoauth.Server) ServerOption {
+	return func(s *Server) { s.oauth = oauth }
+}
+
 // Server wraps a set of [forge.MCPModule] values and serves the MCP protocol
 // over stdio (see [Server.ServeStdio]) or HTTP SSE (see [Server.Handler]).
 type Server struct {
-	app           *forge.App // the forge App; used for BaseURL, GeneratePreviewToken, etc.
+	app           *forge.App            // the forge App; used for BaseURL, GeneratePreviewToken, etc.
 	modules       []forge.MCPModule
 	secret        []byte                // HMAC secret for SSE bearer-token verification
 	tokenStore    *forge.TokenStore     // non-nil when the app has a TokenStore configured
@@ -47,6 +77,7 @@ type Server struct {
 	webhookStore  *forge.WebhookStore   // non-nil when the app has Webhooks configured
 	webhookPool   forge.WebhookJobQueue // non-nil when the app has Webhooks configured
 	subscriptions *subscriptionRegistry // resource subscription fan-out registry
+	oauth         *forgeoauth.Server    // non-nil when OAuth 2.1 is enabled via WithOAuth
 }
 
 // New creates a Server for the given forge App, collecting all content modules

@@ -7,6 +7,43 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.11.0] — 2026-05-24
+
+OAuth 2.1 integration via `WithOAuth` — remote MCP servers for ChatGPT Plus and Claude.ai.
+
+### Added
+
+- `forgemcp.WithOAuth(oauth *forgeoauth.Server) ServerOption` — enables OAuth 2.1
+  authentication. When set, all HTTP requests (GET /mcp SSE and POST /mcp/message)
+  require a valid Bearer access token issued by the forge-oauth authorization server.
+  Unauthenticated requests return HTTP 401 with `WWW-Authenticate: Bearer resource_metadata=...`.
+
+- `GET /.well-known/oauth-protected-resource` — RFC 9728 Protected Resource Metadata.
+  Returns JSON identifying this MCP server and its authorization server. Returns 404
+  when OAuth is not enabled.
+
+- `GET /oauth/*` and `POST /oauth/*` — OAuth 2.1 endpoints (authorization, token) are
+  mounted as a catch-all when `WithOAuth` is configured. Served by `forge-cms.dev/forge-oauth`.
+
+- `GET /.well-known/oauth-authorization-server` — RFC 8414 metadata served by forge-oauth.
+
+- `oauthScopeToRole` scope-to-role mapping:
+  - `mcp` → `forge.Author` (standard AI assistant scope)
+  - `mcp:admin` → `forge.Admin`
+  - All other values → `forge.Author` (safe default)
+
+### Changed
+
+- `Server.Handler()` now always registers `GET /.well-known/oauth-protected-resource`
+  (returns 404 when OAuth is not configured, 200 JSON when enabled).
+
+### Dependencies
+
+- `forge-cms.dev/forge` bumped to v1.25.0 (adds `forge.VerifyTokenString`).
+- `forge-cms.dev/forge-oauth v0.1.0` added (new dependency).
+
+---
+
 ## [1.10.3] — 2026-05-21
 
 ### Fixed

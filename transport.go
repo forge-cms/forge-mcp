@@ -72,24 +72,39 @@ func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) er
 }
 
 // Handler returns an [http.Handler] that serves the MCP protocol over HTTP
-// Server-Sent Events (SSE). Two routes are registered on a fresh [http.ServeMux]:
+// Server-Sent Events (SSE). Routes registered on a fresh [http.ServeMux]:
 //
-//   - GET  /mcp         — SSE endpoint; upgrades to an event stream and sends an
-//     initial "event: open" keepalive, then blocks until the client disconnects.
-//   - POST /mcp/message — accepts a JSON-RPC request body, authenticates the
-//     caller, dispatches through [Server.handle], and returns the JSON-RPC
-//     response.
+//   - GET  /mcp                                    — SSE endpoint
+//   - POST /mcp/message                            — JSON-RPC endpoint
+//   - GET  /.well-known/oauth-protected-resource   — RFC 9728 metadata (404 when OAuth not enabled)
 //
-// Authentication (POST /mcp/message):
+// When [WithOAuth] is configured, additional OAuth 2.1 endpoints are mounted:
+//
+//   - GET  /.well-known/oauth-authorization-server — RFC 8414 metadata
+//   - GET  /oauth/authorize                        — authorization form
+//   - POST /oauth/authorize                        — form submission
+//   - POST /oauth/token                            — code exchange and token refresh
+//
+// Authentication when OAuth is enabled ([WithOAuth]):
+//   - All HTTP requests (GET /mcp and POST /mcp/message) must carry a valid
+//     OAuth Bearer access token. Missing or invalid tokens return HTTP 401 with
+//     a WWW-Authenticate header pointing to the protected resource metadata.
+//
+// Authentication without OAuth (forge bearer tokens):
 //   - If the server was constructed with a non-empty secret (auto-inherited from
-//     [forge.App] via [New], or set via [WithSecret]), every request must carry a
-//     valid "Authorization: Bearer <token>" header. Missing or invalid tokens
-//     return HTTP 401 before any JSON-RPC processing.
+//     [forge.App] via [New], or set via [WithSecret]), POST /mcp/message requires
+//     a valid "Authorization: Bearer <token>" header. GET /mcp is unauthenticated.
 //   - If no secret is configured, requests are treated as [forge.GuestUser].
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /mcp", s.sseHandler)
 	mux.HandleFunc("POST /mcp/message", s.messageHandler)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", s.protectedResourceHandler)
+	if s.oauth != nil {
+		// Mount the OAuth server as a catch-all. Go 1.22+ ServeMux gives priority
+		// to more-specific patterns registered above, so /mcp routes are unaffected.
+		mux.Handle("/", s.oauth.Handler())
+	}
 	return mux
 }
 
@@ -105,6 +120,20 @@ func (s *Server) Handler() http.Handler {
 //     disconnects or the request context is cancelled.
 //  5. Calls RemoveConn on disconnect to release the registry entry.
 func (s *Server) sseHandler(w http.ResponseWriter, r *http.Request) {
+	// When OAuth is enabled, the SSE endpoint requires a valid Bearer token.
+	// A 401 response here triggers the OAuth flow in AI clients (ChatGPT, Claude.ai).
+	if s.oauth != nil {
+		token := extractBearerToken(r)
+		if token == "" {
+			s.writeOAuthChallenge(w)
+			return
+		}
+		if _, err := s.oauth.ValidateAccessToken(r.Context(), token); err != nil {
+			s.writeOAuthChallenge(w)
+			return
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -149,7 +178,24 @@ func (s *Server) sseHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) messageHandler(w http.ResponseWriter, r *http.Request) {
 	// Authentication boundary: HTTP-level 401 before any JSON-RPC decoding.
 	var forgeCtx forge.Context
-	if len(s.secret) > 0 {
+	if s.oauth != nil {
+		// OAuth 2.1 mode: validate Bearer access token issued by forge-oauth.
+		token := extractBearerToken(r)
+		if token == "" {
+			s.writeOAuthChallenge(w)
+			return
+		}
+		at, err := s.oauth.ValidateAccessToken(r.Context(), token)
+		if err != nil {
+			s.writeOAuthChallenge(w)
+			return
+		}
+		forgeCtx = forge.NewContextWithUser(forge.User{
+			ID:    at.ClientID,
+			Roles: []forge.Role{oauthScopeToRole(at.Scope)},
+		})
+	} else if len(s.secret) > 0 {
+		// Forge bearer token mode.
 		user, ok := forge.VerifyBearerToken(r, s.secret, s.tokenStore)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -157,7 +203,7 @@ func (s *Server) messageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		forgeCtx = forge.NewContextWithUser(user)
 	} else {
-		// No secret configured: treat caller as GuestUser.
+		// No authentication configured: treat caller as GuestUser.
 		forgeCtx = forge.NewContextWithUser(forge.GuestUser)
 	}
 
@@ -183,4 +229,60 @@ func (s *Server) messageHandler(w http.ResponseWriter, r *http.Request) {
 	resp := s.handle(forgeCtx, req)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp) //nolint:errcheck
+}
+
+// — OAuth helpers —————————————————————————————————————————————————————————
+
+// extractBearerToken returns the raw token from an "Authorization: Bearer <token>"
+// header, or empty string if absent or malformed.
+func extractBearerToken(r *http.Request) string {
+	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok {
+		return ""
+	}
+	return token
+}
+
+// oauthScopeToRole maps an OAuth scope string to a Forge role.
+//
+//	"mcp:admin"      → forge.Admin
+//	all other values → forge.Author  (standard forge-operator scope for AI clients)
+//
+// The scope "offline_access" is a modifier (enables refresh tokens) and does
+// not affect role mapping — it is combined with the primary scope as a
+// space-separated string (e.g. "mcp offline_access" → Author).
+func oauthScopeToRole(scope string) forge.Role {
+	for _, s := range strings.Fields(scope) {
+		if s == "mcp:admin" {
+			return forge.Admin
+		}
+	}
+	return forge.Author
+}
+
+// writeOAuthChallenge writes HTTP 401 Unauthorized with a WWW-Authenticate
+// header pointing to this server's protected resource metadata document
+// (RFC 9728). AI clients use this URL to discover the authorization server.
+func (s *Server) writeOAuthChallenge(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate",
+		`Bearer resource_metadata="`+s.app.BaseURL()+`/.well-known/oauth-protected-resource"`)
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+}
+
+// protectedResourceHandler serves GET /.well-known/oauth-protected-resource
+// (RFC 9728 — OAuth 2.0 Protected Resource Metadata). Returns JSON identifying
+// this MCP server as a protected resource and listing its authorization server.
+// Returns 404 when OAuth is not enabled ([WithOAuth] not configured).
+func (s *Server) protectedResourceHandler(w http.ResponseWriter, r *http.Request) {
+	if s.oauth == nil {
+		http.NotFound(w, r)
+		return
+	}
+	meta := map[string]any{
+		"resource":                 s.app.BaseURL() + "/mcp",
+		"authorization_servers":   []string{s.oauth.Issuer()},
+		"bearer_methods_supported": []string{"header"},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(meta) //nolint:errcheck
 }
