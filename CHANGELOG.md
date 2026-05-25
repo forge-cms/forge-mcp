@@ -7,6 +7,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.11.1] — 2026-05-25
+
+Forge bearer token fallback alongside OAuth (`WithForgeFallback`).
+
+### Added
+
+- `forgemcp.WithForgeFallback() ServerOption` — when combined with `WithOAuth`,
+  accepts forge bearer tokens as a fallback authentication path. If a Bearer token
+  is not found in the OAuth store (`ErrTokenNotFound`), the server falls through to
+  forge bearer token validation. Expired OAuth tokens (`ErrTokenExpired`) are never
+  eligible for fallback — they return HTTP 401 immediately.
+
+  Use this to keep Claude Desktop, forge-cli, and other forge bearer token clients
+  working alongside OAuth clients (ChatGPT, Claude.ai) on the same MCP server.
+
+---
+
 ## [1.11.0] — 2026-05-24
 
 OAuth 2.1 integration via `WithOAuth` — remote MCP servers for ChatGPT Plus and Claude.ai.

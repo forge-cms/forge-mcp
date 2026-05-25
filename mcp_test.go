@@ -1934,3 +1934,59 @@ func TestOAuth_ProtectedResource_NotEnabled_Returns404(t *testing.T) {
 		t.Errorf("status = %d, want 404", w.Code)
 	}
 }
+
+// TestForgeFallback_ValidForgeBearer_Returns200 verifies that when both
+// WithOAuth and WithForgeFallback are set, a valid forge bearer token is
+// accepted as fallback authentication on POST /mcp/message.
+func TestForgeFallback_ValidForgeBearer_Returns200(t *testing.T) {
+	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	oauthSrv, _ := newTestOAuthServer(t)
+	srv := New(app, WithOAuth(oauthSrv), WithForgeFallback())
+
+	// Sign a valid forge bearer token using the test app's secret.
+	secret := []byte("test-secret-32-bytes-xxxxxxxxxxxx")
+	user := forge.User{ID: "desktop-client", Roles: []forge.Role{forge.Author}}
+	tok, err := forge.SignToken(user, string(secret), 0)
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
+	req := httptest.NewRequest(http.MethodPost, "/mcp/message", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestForgeFallback_WithoutFallback_ForgeBearer_Returns401 verifies that when
+// only WithOAuth is set (no WithForgeFallback), a forge bearer token is rejected
+// with HTTP 401 — the fallback path is not active.
+func TestForgeFallback_WithoutFallback_ForgeBearer_Returns401(t *testing.T) {
+	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	oauthSrv, _ := newTestOAuthServer(t)
+	srv := New(app, WithOAuth(oauthSrv)) // no WithForgeFallback
+
+	// Sign a valid forge bearer token using the test app's secret.
+	secret := []byte("test-secret-32-bytes-xxxxxxxxxxxx")
+	user := forge.User{ID: "desktop-client", Roles: []forge.Role{forge.Author}}
+	tok, err := forge.SignToken(user, string(secret), 0)
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
+	req := httptest.NewRequest(http.MethodPost, "/mcp/message", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+}

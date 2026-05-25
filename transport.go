@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"forge-cms.dev/forge"
+	forgeoauth "forge-cms.dev/forge-oauth"
 )
 
 // ServeStdio runs the MCP server over newline-delimited JSON on the given
@@ -89,6 +90,9 @@ func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) er
 //   - All HTTP requests (GET /mcp and POST /mcp/message) must carry a valid
 //     OAuth Bearer access token. Missing or invalid tokens return HTTP 401 with
 //     a WWW-Authenticate header pointing to the protected resource metadata.
+//   - When [WithForgeFallback] is also set, forge bearer tokens are accepted as
+//     a fallback if the token is not found in the OAuth store. Expired OAuth
+//     tokens are never eligible for fallback.
 //
 // Authentication without OAuth (forge bearer tokens):
 //   - If the server was constructed with a non-empty secret (auto-inherited from
@@ -122,15 +126,26 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) sseHandler(w http.ResponseWriter, r *http.Request) {
 	// When OAuth is enabled, the SSE endpoint requires a valid Bearer token.
 	// A 401 response here triggers the OAuth flow in AI clients (ChatGPT, Claude.ai).
+	// When WithForgeFallback is also set, a forge bearer token is accepted as a
+	// fallback if the OAuth store does not recognise it (ErrTokenNotFound).
 	if s.oauth != nil {
 		token := extractBearerToken(r)
 		if token == "" {
 			s.writeOAuthChallenge(w)
 			return
 		}
-		if _, err := s.oauth.ValidateAccessToken(r.Context(), token); err != nil {
-			s.writeOAuthChallenge(w)
-			return
+		_, err := s.oauth.ValidateAccessToken(r.Context(), token)
+		if err != nil {
+			if s.forgeFallback && errors.Is(err, forgeoauth.ErrTokenNotFound) {
+				if _, ok := forge.VerifyTokenString(token, s.secret, s.tokenStore); !ok {
+					s.writeOAuthChallenge(w)
+					return
+				}
+				// Valid forge bearer token — fall through to SSE stream.
+			} else {
+				s.writeOAuthChallenge(w)
+				return
+			}
 		}
 	}
 
@@ -180,20 +195,32 @@ func (s *Server) messageHandler(w http.ResponseWriter, r *http.Request) {
 	var forgeCtx forge.Context
 	if s.oauth != nil {
 		// OAuth 2.1 mode: validate Bearer access token issued by forge-oauth.
+		// When WithForgeFallback is set, a forge bearer token is accepted as a
+		// fallback if the token is not found in the OAuth store (ErrTokenNotFound).
+		// An expired OAuth token is never eligible for fallback.
 		token := extractBearerToken(r)
 		if token == "" {
 			s.writeOAuthChallenge(w)
 			return
 		}
 		at, err := s.oauth.ValidateAccessToken(r.Context(), token)
-		if err != nil {
+		if err == nil {
+			forgeCtx = forge.NewContextWithUser(forge.User{
+				ID:    at.ClientID,
+				Roles: []forge.Role{oauthScopeToRole(at.Scope)},
+			})
+		} else if s.forgeFallback && errors.Is(err, forgeoauth.ErrTokenNotFound) {
+			// Token not found in OAuth store — try forge bearer token as fallback.
+			user, ok := forge.VerifyTokenString(token, s.secret, s.tokenStore)
+			if !ok {
+				s.writeOAuthChallenge(w)
+				return
+			}
+			forgeCtx = forge.NewContextWithUser(user)
+		} else {
 			s.writeOAuthChallenge(w)
 			return
 		}
-		forgeCtx = forge.NewContextWithUser(forge.User{
-			ID:    at.ClientID,
-			Roles: []forge.Role{oauthScopeToRole(at.Scope)},
-		})
 	} else if len(s.secret) > 0 {
 		// Forge bearer token mode.
 		user, ok := forge.VerifyBearerToken(r, s.secret, s.tokenStore)

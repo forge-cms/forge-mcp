@@ -37,6 +37,20 @@ func WithModule(m forge.MCPModule) ServerOption {
 	return func(s *Server) { s.modules = append(s.modules, m) }
 }
 
+// WithForgeFallback enables forge bearer token authentication as a fallback
+// when [WithOAuth] is also configured. When both options are set, the server
+// first attempts OAuth access token validation; if the token is not found in
+// the OAuth store ([forgeoauth.ErrTokenNotFound]), it falls through to forge
+// bearer token validation. An expired OAuth token ([forgeoauth.ErrTokenExpired])
+// is never eligible for fallback — it returns HTTP 401 immediately.
+//
+// Use this when forge bearer token clients (Claude Desktop, forge-cli, internal
+// tooling) must continue to work alongside OAuth clients (ChatGPT, Claude.ai).
+// Without WithForgeFallback, WithOAuth rejects all non-OAuth tokens.
+func WithForgeFallback() ServerOption {
+	return func(s *Server) { s.forgeFallback = true }
+}
+
 // WithOAuth enables OAuth 2.1 authentication for the MCP server.
 // The provided forge-oauth [forgeoauth.Server] handles authorization and token
 // issuance; all MCP requests (both GET /mcp SSE and POST /mcp/message) must
@@ -78,6 +92,7 @@ type Server struct {
 	webhookPool   forge.WebhookJobQueue // non-nil when the app has Webhooks configured
 	subscriptions *subscriptionRegistry // resource subscription fan-out registry
 	oauth         *forgeoauth.Server    // non-nil when OAuth 2.1 is enabled via WithOAuth
+	forgeFallback bool                  // accept forge bearer tokens as fallback when OAuth enabled
 }
 
 // New creates a Server for the given forge App, collecting all content modules
