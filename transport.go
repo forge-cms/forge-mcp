@@ -72,11 +72,12 @@ func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) er
 	}
 }
 
-// Handler returns an [http.Handler] that serves the MCP protocol over HTTP
-// Server-Sent Events (SSE). Routes registered on a fresh [http.ServeMux]:
+// Handler returns an [http.Handler] that serves the MCP protocol over HTTP.
+// Routes registered on a fresh [http.ServeMux]:
 //
-//   - GET  /mcp                                    — SSE endpoint
-//   - POST /mcp/message                            — JSON-RPC endpoint
+//   - GET  /mcp                                    — SSE endpoint (MCP 2024-11-05 transport)
+//   - POST /mcp                                    — JSON-RPC endpoint (MCP 2025-11-25 streamable HTTP)
+//   - POST /mcp/message                            — JSON-RPC endpoint (MCP 2024-11-05 SSE transport)
 //   - GET  /.well-known/oauth-protected-resource   — RFC 9728 metadata (404 when OAuth not enabled)
 //
 // When [WithOAuth] is configured, additional OAuth 2.1 endpoints are mounted:
@@ -102,6 +103,7 @@ func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) er
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /mcp", s.sseHandler)
+	mux.HandleFunc("POST /mcp", s.messageHandler)
 	mux.HandleFunc("POST /mcp/message", s.messageHandler)
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource", s.protectedResourceHandler)
 	if s.oauth != nil {

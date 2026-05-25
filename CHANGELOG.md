@@ -7,6 +7,19 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.11.2] — 2026-05-25
+
+Handle `POST /mcp` for MCP 2025-11-25 streamable HTTP transport.
+
+### Added
+
+- `POST /mcp` route in `Handler()` — alias for `POST /mcp/message`, serving the
+  same `messageHandler`. ChatGPT Plus (MCP protocol version 2025-11-25) POSTs
+  `initialize` and all JSON-RPC requests directly to `/mcp`; the previous
+  `/mcp/message`-only routing returned 404. Both paths remain active.
+
+---
+
 ## [1.11.1] — 2026-05-25
 
 Forge bearer token fallback alongside OAuth (`WithForgeFallback`).
