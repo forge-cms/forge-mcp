@@ -3,7 +3,7 @@ package forgemcp
 import (
 	"time"
 
-	"forge-cms.dev/forge"
+	"smeldr.dev/core"
 )
 
 // uploadToolDefs returns the single Author+ upload token tool definition.

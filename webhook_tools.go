@@ -3,7 +3,7 @@ package forgemcp
 import (
 	"fmt"
 
-	"forge-cms.dev/forge"
+	"smeldr.dev/core"
 )
 
 // webhookToolDefs returns the five Admin-only webhook management tool

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"forge-cms.dev/forge"
+	"smeldr.dev/core"
 )
 
 // toolName builds the MCP tool name for a given operation and content type.

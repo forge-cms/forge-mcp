@@ -1,10 +1,10 @@
-module forge-cms.dev/forge-mcp
+module smeldr.dev/mcp
 
 go 1.26.3
 
 require (
-	forge-cms.dev/forge v1.25.0
-	forge-cms.dev/forge-oauth v0.1.0
+	smeldr.dev/core v0.0.0
+	smeldr.dev/oauth v0.0.0
 )
 
 require (

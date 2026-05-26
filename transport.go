@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"strings"
 
-	"forge-cms.dev/forge"
-	forgeoauth "forge-cms.dev/forge-oauth"
+	"smeldr.dev/core"
+	forgeoauth "smeldr.dev/oauth"
 )
 
 // ServeStdio runs the MCP server over newline-delimited JSON on the given
@@ -309,7 +309,7 @@ func (s *Server) protectedResourceHandler(w http.ResponseWriter, r *http.Request
 	}
 	meta := map[string]any{
 		"resource":                 s.app.BaseURL() + "/mcp",
-		"authorization_servers":   []string{s.oauth.Issuer()},
+		"authorization_servers":    []string{s.oauth.Issuer()},
 		"bearer_methods_supported": []string{"header"},
 	}
 	w.Header().Set("Content-Type", "application/json")

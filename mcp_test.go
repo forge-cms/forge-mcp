@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"forge-cms.dev/forge"
-	forgeoauth "forge-cms.dev/forge-oauth"
+	"smeldr.dev/core"
+	forgeoauth "smeldr.dev/oauth"
 )
 
 // testMCPPost is the canonical content type for all forge-mcp tests.

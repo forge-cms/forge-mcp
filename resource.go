@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"forge-cms.dev/forge"
+	"smeldr.dev/core"
 )
 
 // resourceContent is the wire format for a single item returned by resources/read.

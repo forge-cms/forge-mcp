@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"forge-cms.dev/forge"
+	"smeldr.dev/core"
 )
 
 // previewToolDefs returns the single Editor-or-Admin preview URL tool definition.

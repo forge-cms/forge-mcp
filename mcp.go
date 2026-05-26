@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"log"
 
-	"forge-cms.dev/forge"
-	forgeoauth "forge-cms.dev/forge-oauth"
+	"smeldr.dev/core"
+	forgeoauth "smeldr.dev/oauth"
 )
 
 // ServerOption configures a [Server]. Use [WithSecret] to override the HMAC
@@ -83,7 +83,7 @@ func WithOAuth(oauth *forgeoauth.Server) ServerOption {
 // Server wraps a set of [forge.MCPModule] values and serves the MCP protocol
 // over stdio (see [Server.ServeStdio]) or HTTP SSE (see [Server.Handler]).
 type Server struct {
-	app           *forge.App            // the forge App; used for BaseURL, GeneratePreviewToken, etc.
+	app           *forge.App // the forge App; used for BaseURL, GeneratePreviewToken, etc.
 	modules       []forge.MCPModule
 	secret        []byte                // HMAC secret for SSE bearer-token verification
 	tokenStore    *forge.TokenStore     // non-nil when the app has a TokenStore configured
