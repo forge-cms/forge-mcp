@@ -1,7 +1,3 @@
-forge-cms.dev/forge v1.25.0 h1:H3jz1hYa2lrRpNHR0fhkMIRSbT1DePMLW/Ms1kqjI8k=
-forge-cms.dev/forge v1.25.0/go.mod h1:no4FvP8bEF3tv2rICPdrmK/yhWZ1squRwAV8sqtLPd4=
-forge-cms.dev/forge-oauth v0.1.0 h1:FYCboxw5BD+hBbERvKTe8xX8Y3/GAPxdUxyYdFhsbE4=
-forge-cms.dev/forge-oauth v0.1.0/go.mod h1:E6OL1C1c4hDPeNs46imtbfZ9joLJtWbt7U07KwGXtSo=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e h1:ijClszYn+mADRFY17kjQEVQ1XRhq2/JR1M3sGqeJoxs=
@@ -53,3 +49,7 @@ modernc.org/strutil v1.2.1 h1:UneZBkQA+DX2Rp35KcM69cSsNES9ly8mQWD71HKlOA0=
 modernc.org/strutil v1.2.1/go.mod h1:EHkiggD70koQxjVdSBM3JKM7k6L0FbGE5eymy9i3B9A=
 modernc.org/token v1.1.0 h1:Xl7Ap9dKaEs5kLoOQeQmPWevfnk/DM5qcLcYlA8ys6Y=
 modernc.org/token v1.1.0/go.mod h1:UGzOrNV1mAFSEB63lOFHIpNRUVMvYTc6yu1SMY/XTDM=
+smeldr.dev/core v1.25.1 h1:SKRjHUYIj6v7II3lYHICLxgr8mEGfWh20FV7dk227WA=
+smeldr.dev/core v1.25.1/go.mod h1:37nzRN/NmG34EXpPdcrZ8N7bKww6AVTmYsdj+BpsDps=
+smeldr.dev/oauth v0.1.2 h1:iWCD7UvHM6rNLj7m88ZOvcyNr6xcuwuMz7FiRFzg36E=
+smeldr.dev/oauth v0.1.2/go.mod h1:UFgw9v8P9NrG3Jx8y8bNjMwf1LrWCqErtwDiIWh7bRI=
