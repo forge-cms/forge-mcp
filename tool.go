@@ -26,9 +26,9 @@ func parseToolName(name string) (op, typeSnake string, ok bool) {
 // moduleForType returns the first MCPWrite module whose TypeName, when
 // converted to lower_snake_case, equals typeSnake.
 // Returns (nil, false) when no matching module is found.
-func (s *Server) moduleForType(typeSnake string) (forge.MCPModule, bool) {
+func (s *Server) moduleForType(typeSnake string) (smeldr.MCPModule, bool) {
 	for _, m := range s.modules {
-		if hasMCPOp(m, forge.MCPWrite) && snakeCase(m.MCPMeta().TypeName) == typeSnake {
+		if hasMCPOp(m, smeldr.MCPWrite) && snakeCase(m.MCPMeta().TypeName) == typeSnake {
 			return m, true
 		}
 	}
@@ -39,7 +39,7 @@ func (s *Server) moduleForType(typeSnake string) (forge.MCPModule, bool) {
 // The list tool appends "s" to the type's snake_case name (e.g. "list_posts"
 // targets the "post" type), so this helper tries typeSnake with a trailing
 // "s" stripped when a direct lookup fails.
-func (s *Server) moduleForAdminList(typeSnake string) (forge.MCPModule, bool) {
+func (s *Server) moduleForAdminList(typeSnake string) (smeldr.MCPModule, bool) {
 	if m, ok := s.moduleForType(typeSnake); ok {
 		return m, true
 	}
@@ -51,8 +51,8 @@ func (s *Server) moduleForAdminList(typeSnake string) (forge.MCPModule, bool) {
 
 // authorise returns a -32001 error when the caller lacks the Author role,
 // which is the minimum required for any MCPWrite operation.
-func (s *Server) authorise(ctx forge.Context) *jsonRPCError {
-	if forge.HasRole(ctx.User().Roles, forge.Author) {
+func (s *Server) authorise(ctx smeldr.Context) *jsonRPCError {
+	if smeldr.HasRole(ctx.User().Roles, smeldr.Author) {
 		return nil
 	}
 	return &jsonRPCError{Code: -32001, Message: "forbidden"}
@@ -61,8 +61,8 @@ func (s *Server) authorise(ctx forge.Context) *jsonRPCError {
 // authoriseEditor returns a -32001 error when the caller lacks Editor role.
 // Editor is the minimum role required for admin read tools (list_{type}s,
 // get_{type}). Admin also satisfies this check via the hierarchical role system.
-func (s *Server) authoriseEditor(ctx forge.Context) *jsonRPCError {
-	if forge.HasRole(ctx.User().Roles, forge.Editor) {
+func (s *Server) authoriseEditor(ctx smeldr.Context) *jsonRPCError {
+	if smeldr.HasRole(ctx.User().Roles, smeldr.Editor) {
 		return nil
 	}
 	return &jsonRPCError{Code: -32001, Message: "forbidden"}
@@ -71,27 +71,27 @@ func (s *Server) authoriseEditor(ctx forge.Context) *jsonRPCError {
 // authoriseAdmin returns a -32001 error when the caller lacks Admin role.
 // Admin is required for token management operations (create_token, list_tokens,
 // revoke_token).
-func (s *Server) authoriseAdmin(ctx forge.Context) *jsonRPCError {
-	if forge.HasRole(ctx.User().Roles, forge.Admin) {
+func (s *Server) authoriseAdmin(ctx smeldr.Context) *jsonRPCError {
+	if smeldr.HasRole(ctx.User().Roles, smeldr.Admin) {
 		return nil
 	}
 	return &jsonRPCError{Code: -32001, Message: "forbidden"}
 }
 
 // errorFor maps a forge error to a JSON-RPC error:
-//   - [forge.ValidationError] → -32602 (invalid params) with the validation message
-//   - [forge.ErrNotFound]      → -32001 (resource not found)
-//   - [forge.ErrForbidden]     → -32001 (permission denied)
+//   - [smeldr.ValidationError] → -32602 (invalid params) with the validation message
+//   - [smeldr.ErrNotFound]      → -32001 (resource not found)
+//   - [smeldr.ErrForbidden]     → -32001 (permission denied)
 //   - all other errors         → -32603 (internal error)
 func errorFor(err error) *jsonRPCError {
-	var ve *forge.ValidationError
+	var ve *smeldr.ValidationError
 	if errors.As(err, &ve) {
 		return &jsonRPCError{Code: -32602, Message: ve.Error()}
 	}
-	if errors.Is(err, forge.ErrNotFound) {
+	if errors.Is(err, smeldr.ErrNotFound) {
 		return &jsonRPCError{Code: -32001, Message: "not found"}
 	}
-	if errors.Is(err, forge.ErrForbidden) {
+	if errors.Is(err, smeldr.ErrForbidden) {
 		return &jsonRPCError{Code: -32001, Message: "forbidden"}
 	}
 	return &jsonRPCError{Code: -32603, Message: "internal error: " + err.Error()}
@@ -107,7 +107,7 @@ func errorFor(err error) *jsonRPCError {
 func (s *Server) handleToolsList() any {
 	var tools []mcpTool
 	for _, m := range s.modules {
-		if !hasMCPOp(m, forge.MCPWrite) {
+		if !hasMCPOp(m, smeldr.MCPWrite) {
 			continue
 		}
 		tools = append(tools, mcpToolDefs(m)...)
@@ -138,7 +138,7 @@ func (s *Server) handleToolsList() any {
 // unconstrained string fields set to "" are accepted through the overlay.
 // Callers that need to reset a required field must delete and recreate the
 // item.
-func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any, *jsonRPCError) {
+func (s *Server) handleToolsCall(ctx smeldr.Context, params json.RawMessage) (any, *jsonRPCError) {
 	var p struct {
 		Name      string         `json:"name"`
 		Arguments map[string]any `json:"arguments"`
@@ -250,8 +250,8 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 		if err != nil {
 			return nil, errorFor(err)
 		}
-		type statuser interface{ GetStatus() forge.Status }
-		if st, isStatuser := existing.(statuser); isStatuser && st.GetStatus() == forge.Published {
+		type statuser interface{ GetStatus() smeldr.Status }
+		if st, isStatuser := existing.(statuser); isStatuser && st.GetStatus() == smeldr.Published {
 			return toolResult(map[string]any{"slug": slug, "status": "published"}), nil
 		}
 		if err := m.MCPPublish(ctx, slug); err != nil {
@@ -308,9 +308,9 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 		if rpcErr := s.authoriseEditor(ctx); rpcErr != nil {
 			return nil, rpcErr
 		}
-		var statuses []forge.Status
+		var statuses []smeldr.Status
 		if statusStr, ok := stringArg(args, "status"); ok {
-			statuses = []forge.Status{forge.Status(statusStr)}
+			statuses = []smeldr.Status{smeldr.Status(statusStr)}
 		}
 		items, err := lm.MCPList(ctx, statuses...)
 		if err != nil {
@@ -347,7 +347,7 @@ func (s *Server) handleToolsCall(ctx forge.Context, params json.RawMessage) (any
 // handleToolMethod dispatches tool-related JSON-RPC methods.
 // Returns (response, true) when the method is handled, (zero, false) otherwise.
 // This allows the main handle switch in mcp.go to delegate cleanly.
-func (s *Server) handleToolMethod(ctx forge.Context, req jsonRPCRequest) (jsonRPCResponse, bool) {
+func (s *Server) handleToolMethod(ctx smeldr.Context, req jsonRPCRequest) (jsonRPCResponse, bool) {
 	switch req.Method {
 	case "tools/list":
 		return jsonRPCResponse{
@@ -447,7 +447,7 @@ func tokenToolDefs() []mcpTool {
 // handleTokenTool dispatches create_token, list_tokens, and revoke_token
 // requests. Called only when s.tokenStore is non-nil and the caller holds
 // Admin role (checked by the caller).
-func (s *Server) handleTokenTool(ctx forge.Context, name string, args map[string]any) (any, *jsonRPCError) {
+func (s *Server) handleTokenTool(ctx smeldr.Context, name string, args map[string]any) (any, *jsonRPCError) {
 	switch name {
 	case "create_token":
 		tokenName, ok := stringArg(args, "name")
@@ -478,7 +478,7 @@ func (s *Server) handleTokenTool(ctx forge.Context, name string, args map[string
 			return nil, errorFor(err)
 		}
 		if records == nil {
-			records = []forge.TokenRecord{}
+			records = []smeldr.TokenRecord{}
 		}
 		return toolResult(map[string]any{"tokens": records}), nil
 
@@ -488,7 +488,7 @@ func (s *Server) handleTokenTool(ctx forge.Context, name string, args map[string
 			return nil, &jsonRPCError{Code: -32602, Message: "invalid params: id required"}
 		}
 		if err := s.tokenStore.Revoke(ctx, id); err != nil {
-			if errors.Is(err, forge.ErrLastAdmin) {
+			if errors.Is(err, smeldr.ErrLastAdmin) {
 				return nil, &jsonRPCError{Code: -32602, Message: "Cannot revoke token: it is the last active admin token. Create a replacement admin token before revoking this one."}
 			}
 			return nil, errorFor(err)
@@ -573,12 +573,12 @@ func navToolDefs(hasDB bool) []mcpTool {
 // handleNavTool dispatches list_nav_items, create_nav_item, update_nav_item,
 // and delete_nav_item requests. Called only when s.navTree is non-nil and the
 // caller holds Editor role (checked by the caller).
-func (s *Server) handleNavTool(ctx forge.Context, name string, args map[string]any) (any, *jsonRPCError) {
+func (s *Server) handleNavTool(ctx smeldr.Context, name string, args map[string]any) (any, *jsonRPCError) {
 	switch name {
 	case "list_nav_items":
 		items := s.navTree.List()
 		if items == nil {
-			items = []forge.NavItem{}
+			items = []smeldr.NavItem{}
 		}
 		return toolResult(map[string]any{"items": items}), nil
 
@@ -587,7 +587,7 @@ func (s *Server) handleNavTool(ctx forge.Context, name string, args map[string]a
 		if !ok {
 			return nil, &jsonRPCError{Code: -32602, Message: "invalid params: label required"}
 		}
-		item := forge.NavItem{
+		item := smeldr.NavItem{
 			Label:     label,
 			Path:      stringArgOr(args, "path", ""),
 			ParentID:  stringArgOr(args, "parent_id", ""),

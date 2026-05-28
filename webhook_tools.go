@@ -93,7 +93,7 @@ func webhookToolDefs() []mcpTool {
 // handleWebhookTool dispatches create_webhook, list_webhooks, delete_webhook,
 // list_webhook_deliveries, and retry_webhook requests. Called only when
 // s.webhookStore is non-nil and the caller holds Admin role (checked by caller).
-func (s *Server) handleWebhookTool(ctx forge.Context, name string, args map[string]any) (any, *jsonRPCError) {
+func (s *Server) handleWebhookTool(ctx smeldr.Context, name string, args map[string]any) (any, *jsonRPCError) {
 	switch name {
 	case "create_webhook":
 		rawURL, ok := stringArg(args, "url")
@@ -136,7 +136,7 @@ func (s *Server) handleWebhookTool(ctx forge.Context, name string, args map[stri
 			return nil, errorFor(err)
 		}
 		if endpoints == nil {
-			endpoints = []forge.WebhookEndpoint{}
+			endpoints = []smeldr.WebhookEndpoint{}
 		}
 		// Augment with delivery stats when the pool is available.
 		type endpointSummary struct {
@@ -197,7 +197,7 @@ func (s *Server) handleWebhookTool(ctx forge.Context, name string, args map[stri
 				return nil, errorFor(err)
 			}
 			if logs == nil {
-				logs = []forge.DeliveryLog{}
+				logs = []smeldr.DeliveryLog{}
 			}
 			return toolResult(map[string]any{"logs": logs}), nil
 		}
@@ -206,7 +206,7 @@ func (s *Server) handleWebhookTool(ctx forge.Context, name string, args map[stri
 			return nil, errorFor(err)
 		}
 		if jobs == nil {
-			jobs = []forge.OutboundJob{}
+			jobs = []smeldr.OutboundJob{}
 		}
 		return toolResult(map[string]any{"jobs": jobs}), nil
 

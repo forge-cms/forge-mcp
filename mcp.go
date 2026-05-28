@@ -1,5 +1,5 @@
 // Package forgemcp implements an MCP (Model Context Protocol) server for Forge
-// applications. It exposes content modules registered with forge.MCP(...) as
+// applications. It exposes content modules registered with smeldr.MCP(...) as
 // MCP resources and tools, enabling AI assistants to query and manage content
 // through a structured protocol.
 package forgemcp
@@ -18,22 +18,22 @@ import (
 type ServerOption func(*Server)
 
 // WithSecret overrides the HMAC secret used to verify SSE bearer tokens.
-// The secret must match Config.Secret from the forge.App passed to New.
-// Tokens minted by [forge.SignToken] with a different secret will fail SSE
+// The secret must match Config.Secret from the smeldr.App passed to New.
+// Tokens minted by [smeldr.SignToken] with a different secret will fail SSE
 // verification with HTTP 401. WithSecret is only needed for secret rotation.
 func WithSecret(secret []byte) ServerOption {
 	return func(s *Server) { s.secret = secret }
 }
 
-// WithModule registers an additional [forge.MCPModule] with the MCP server.
+// WithModule registers an additional [smeldr.MCPModule] with the MCP server.
 // Use this to expose modules from external sub-packages (e.g. forge-media)
-// that cannot be wired through [forge.App.MCPModules] directly.
+// that cannot be wired through [smeldr.App.MCPModules] directly.
 //
 // Example:
 //
 //	mediaSrv := forgemedia.Register(app, store)
 //	mcpSrv := forgemcp.New(app, forgemcp.WithModule(mediaSrv))
-func WithModule(m forge.MCPModule) ServerOption {
+func WithModule(m smeldr.MCPModule) ServerOption {
 	return func(s *Server) { s.modules = append(s.modules, m) }
 }
 
@@ -71,7 +71,7 @@ func WithForgeFallback() ServerOption {
 //	oauthSrv := forgeoauth.New(forgeoauth.Config{
 //	    Issuer: "https://cms.example.com",
 //	    VerifyBearer: func(token string) bool {
-//	        _, ok := forge.VerifyTokenString(token, app.Secret(), app.TokenStore())
+//	        _, ok := smeldr.VerifyTokenString(token, app.Secret(), app.TokenStore())
 //	        return ok
 //	    },
 //	}, store)
@@ -80,26 +80,26 @@ func WithOAuth(oauth *forgeoauth.Server) ServerOption {
 	return func(s *Server) { s.oauth = oauth }
 }
 
-// Server wraps a set of [forge.MCPModule] values and serves the MCP protocol
+// Server wraps a set of [smeldr.MCPModule] values and serves the MCP protocol
 // over stdio (see [Server.ServeStdio]) or HTTP SSE (see [Server.Handler]).
 type Server struct {
-	app           *forge.App // the forge App; used for BaseURL, GeneratePreviewToken, etc.
-	modules       []forge.MCPModule
+	app           *smeldr.App // the forge App; used for BaseURL, GeneratePreviewToken, etc.
+	modules       []smeldr.MCPModule
 	secret        []byte                // HMAC secret for SSE bearer-token verification
-	tokenStore    *forge.TokenStore     // non-nil when the app has a TokenStore configured
-	navTree       *forge.NavTree        // non-nil when the app has a NavTree configured
-	webhookStore  *forge.WebhookStore   // non-nil when the app has Webhooks configured
-	webhookPool   forge.WebhookJobQueue // non-nil when the app has Webhooks configured
+	tokenStore    *smeldr.TokenStore     // non-nil when the app has a TokenStore configured
+	navTree       *smeldr.NavTree        // non-nil when the app has a NavTree configured
+	webhookStore  *smeldr.WebhookStore   // non-nil when the app has Webhooks configured
+	webhookPool   smeldr.WebhookJobQueue // non-nil when the app has Webhooks configured
 	subscriptions *subscriptionRegistry // resource subscription fan-out registry
 	oauth         *forgeoauth.Server    // non-nil when OAuth 2.1 is enabled via WithOAuth
 	forgeFallback bool                  // accept forge bearer tokens as fallback when OAuth enabled
 }
 
 // New creates a Server for the given forge App, collecting all content modules
-// registered with forge.MCP(...). The App's HMAC secret (Config.Secret) is
+// registered with smeldr.MCP(...). The App's HMAC secret (Config.Secret) is
 // inherited automatically and used for SSE bearer-token verification.
 // Pass [WithSecret] to override (e.g. during secret rotation).
-func New(app *forge.App, opts ...ServerOption) *Server {
+func New(app *smeldr.App, opts ...ServerOption) *Server {
 	s := &Server{
 		app:           app,
 		modules:       app.MCPModules(),
@@ -115,13 +115,13 @@ func New(app *forge.App, opts ...ServerOption) *Server {
 	}
 	if len(s.secret) > 0 && !bytes.Equal(s.secret, app.Secret()) {
 		log.Printf("forge-mcp: WithSecret value differs from app Config.Secret — " +
-			"tokens minted by forge.SignToken will fail SSE verification")
+			"tokens minted by smeldr.SignToken will fail SSE verification")
 	}
 	// Bridge app-level signals to resource-subscription notifications.
 	// For each delivery signal, find the module that owns the content type
 	// and construct the resource URI from the prefix and item slug.
 	subs := s.subscriptions
-	app.AddSignalListener(func(sig forge.Signal, typeName string, item any) {
+	app.AddSignalListener(func(sig smeldr.Signal, typeName string, item any) {
 		for _, m := range s.modules {
 			if m.MCPMeta().TypeName != typeName {
 				continue
@@ -155,13 +155,13 @@ type mcpTool struct {
 
 // allResources iterates MCPRead modules and builds the full resource list.
 // Only Published items are included — lifecycle enforcement is unconditional.
-func (s *Server) allResources(ctx forge.Context) []mcpResource {
+func (s *Server) allResources(ctx smeldr.Context) []mcpResource {
 	var out []mcpResource
 	for _, m := range s.modules {
-		if !hasMCPOp(m, forge.MCPRead) {
+		if !hasMCPOp(m, smeldr.MCPRead) {
 			continue
 		}
-		items, err := m.MCPList(ctx, forge.Published)
+		items, err := m.MCPList(ctx, smeldr.Published)
 		if err != nil {
 			continue
 		}
@@ -192,7 +192,7 @@ var slugOnlySchema = map[string]any{
 }
 
 // fieldToProp converts a single MCPField to its JSON Schema property object.
-func fieldToProp(f forge.MCPField) map[string]any {
+func fieldToProp(f smeldr.MCPField) map[string]any {
 	var prop map[string]any
 	switch f.Type {
 	case "array":
@@ -223,7 +223,7 @@ func fieldToProp(f forge.MCPField) map[string]any {
 }
 
 // mcpToolDefs returns the tool definitions for a module that has MCPWrite.
-func mcpToolDefs(m forge.MCPModule) []mcpTool {
+func mcpToolDefs(m smeldr.MCPModule) []mcpTool {
 	meta := m.MCPMeta()
 	typeSnake := snakeCase(meta.TypeName)
 	schema := m.MCPSchema()
@@ -274,9 +274,9 @@ func mcpToolDefs(m forge.MCPModule) []mcpTool {
 //   - get_{type} — fetch a single item by slug regardless of status
 //   - delete_{type} — permanently delete an item by slug
 //
-// For [forge.SingleInstance] modules, the list_{type}s tool is suppressed
+// For [smeldr.SingleInstance] modules, the list_{type}s tool is suppressed
 // because the module has at most one item — get_{type} is sufficient.
-func mcpAdminReadToolDefs(m forge.MCPModule) []mcpTool {
+func mcpAdminReadToolDefs(m smeldr.MCPModule) []mcpTool {
 	meta := m.MCPMeta()
 	typeSnake := snakeCase(meta.TypeName)
 
@@ -321,7 +321,7 @@ func mcpAdminReadToolDefs(m forge.MCPModule) []mcpTool {
 	return append([]mcpTool{list}, getAndDelete...)
 }
 
-// inputSchema converts []forge.MCPField to a JSON Schema object suitable for
+// inputSchema converts []smeldr.MCPField to a JSON Schema object suitable for
 // MCP tools/list, marking Required fields in the required array.
 // When a field carries a forge_format or forge_description tag, a
 // "description" key is added to the property using the priority rules from
@@ -329,7 +329,7 @@ func mcpAdminReadToolDefs(m forge.MCPModule) []mcpTool {
 //   - Both present: forge_description + " (" + forge_format + ")"
 //   - Only forge_format: "(" + forge_format + ")"
 //   - Neither: no description key emitted
-func inputSchema(fields []forge.MCPField) map[string]any {
+func inputSchema(fields []smeldr.MCPField) map[string]any {
 	props := make(map[string]any, len(fields))
 	var required []string
 	for _, f := range fields {
@@ -352,7 +352,7 @@ func inputSchema(fields []forge.MCPField) map[string]any {
 // and makes all content fields optional (partial-update semantics).
 // Description hints from forge_format and forge_description tags are applied
 // using the same priority rules as [inputSchema] (Decision 27).
-func inputSchemaUpdate(fields []forge.MCPField) map[string]any {
+func inputSchemaUpdate(fields []smeldr.MCPField) map[string]any {
 	props := map[string]any{
 		"slug": map[string]any{"type": "string"},
 	}
@@ -371,7 +371,7 @@ func inputSchemaUpdate(fields []forge.MCPField) map[string]any {
 //   - Both non-empty: Description + " (" + Format + ")"
 //   - Only Format: "(" + Format + ")"
 //   - Neither: ""
-func fieldDescription(f forge.MCPField) string {
+func fieldDescription(f smeldr.MCPField) string {
 	switch {
 	case f.Description != "" && f.Format != "":
 		return f.Description + " (" + f.Format + ")"
@@ -386,7 +386,7 @@ func fieldDescription(f forge.MCPField) string {
 // Returns a jsonRPCResponse ready for serialisation. Full dispatch logic is
 // implemented in Steps 2–4; this stub returns a method-not-found error for any
 // method other than "initialize".
-func (s *Server) handle(ctx forge.Context, req jsonRPCRequest) jsonRPCResponse {
+func (s *Server) handle(ctx smeldr.Context, req jsonRPCRequest) jsonRPCResponse {
 	switch req.Method {
 	case "initialize":
 		return jsonRPCResponse{
@@ -447,7 +447,7 @@ type jsonRPCError struct {
 }
 
 // hasMCPOp reports whether m's Operations slice contains op.
-func hasMCPOp(m forge.MCPModule, op forge.MCPOperation) bool {
+func hasMCPOp(m smeldr.MCPModule, op smeldr.MCPOperation) bool {
 	for _, o := range m.MCPMeta().Operations {
 		if o == op {
 			return true
@@ -456,7 +456,7 @@ func hasMCPOp(m forge.MCPModule, op forge.MCPOperation) bool {
 	return false
 }
 
-// slugOf extracts the Slug field from an item via the forge.Node GetSlug method.
+// slugOf extracts the Slug field from an item via the smeldr.Node GetSlug method.
 // Returns "" when the item does not implement the interface.
 func slugOf(item any) string {
 	type slugger interface{ GetSlug() string }

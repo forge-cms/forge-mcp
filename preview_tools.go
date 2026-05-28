@@ -36,8 +36,8 @@ func isPreviewTool(name string) bool { return name == "create_preview_url" }
 
 // handlePreviewTool executes the create_preview_url tool.
 // Requires Admin role (verified by the caller in tool.go before dispatch).
-// app is the forge.App passed to [New]; it carries BaseURL and GeneratePreviewToken.
-func (s *Server) handlePreviewTool(app *forge.App, name string, args map[string]any) (any, *jsonRPCError) {
+// app is the smeldr.App passed to [New]; it carries BaseURL and GeneratePreviewToken.
+func (s *Server) handlePreviewTool(app *smeldr.App, name string, args map[string]any) (any, *jsonRPCError) {
 	if name != "create_preview_url" {
 		return nil, &jsonRPCError{Code: -32601, Message: "unknown preview tool: " + name}
 	}

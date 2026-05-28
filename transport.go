@@ -26,12 +26,12 @@ import (
 // Empty lines are skipped. Malformed JSON returns a -32700 parse-error response.
 // ServeStdio returns when ctx is cancelled or in reaches EOF.
 //
-// The stdio transport runs with [forge.Admin] privileges — the process runs
+// The stdio transport runs with [smeldr.Admin] privileges — the process runs
 // locally and the operator is trusted.
 func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) error {
-	forgeCtx := forge.NewContextWithUser(forge.User{
+	forgeCtx := smeldr.NewContextWithUser(smeldr.User{
 		ID:    "stdio",
-		Roles: []forge.Role{forge.Admin},
+		Roles: []smeldr.Role{smeldr.Admin},
 	})
 
 	scanner := bufio.NewScanner(in)
@@ -97,9 +97,9 @@ func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) er
 //
 // Authentication without OAuth (forge bearer tokens):
 //   - If the server was constructed with a non-empty secret (auto-inherited from
-//     [forge.App] via [New], or set via [WithSecret]), POST /mcp/message requires
+//     [smeldr.App] via [New], or set via [WithSecret]), POST /mcp/message requires
 //     a valid "Authorization: Bearer <token>" header. GET /mcp is unauthenticated.
-//   - If no secret is configured, requests are treated as [forge.GuestUser].
+//   - If no secret is configured, requests are treated as [smeldr.GuestUser].
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /mcp", s.sseHandler)
@@ -139,7 +139,7 @@ func (s *Server) sseHandler(w http.ResponseWriter, r *http.Request) {
 		_, err := s.oauth.ValidateAccessToken(r.Context(), token)
 		if err != nil {
 			if s.forgeFallback && errors.Is(err, forgeoauth.ErrTokenNotFound) {
-				if _, ok := forge.VerifyTokenString(token, s.secret, s.tokenStore); !ok {
+				if _, ok := smeldr.VerifyTokenString(token, s.secret, s.tokenStore); !ok {
 					s.writeOAuthChallenge(w)
 					return
 				}
@@ -194,7 +194,7 @@ func (s *Server) sseHandler(w http.ResponseWriter, r *http.Request) {
 // limit, and writes a JSON-RPC response for every outcome.
 func (s *Server) messageHandler(w http.ResponseWriter, r *http.Request) {
 	// Authentication boundary: HTTP-level 401 before any JSON-RPC decoding.
-	var forgeCtx forge.Context
+	var forgeCtx smeldr.Context
 	if s.oauth != nil {
 		// OAuth 2.1 mode: validate Bearer access token issued by forge-oauth.
 		// When WithForgeFallback is set, a forge bearer token is accepted as a
@@ -207,33 +207,33 @@ func (s *Server) messageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		at, err := s.oauth.ValidateAccessToken(r.Context(), token)
 		if err == nil {
-			forgeCtx = forge.NewContextWithUser(forge.User{
+			forgeCtx = smeldr.NewContextWithUser(smeldr.User{
 				ID:    at.ClientID,
-				Roles: []forge.Role{oauthScopeToRole(at.Scope)},
+				Roles: []smeldr.Role{oauthScopeToRole(at.Scope)},
 			})
 		} else if s.forgeFallback && errors.Is(err, forgeoauth.ErrTokenNotFound) {
 			// Token not found in OAuth store — try forge bearer token as fallback.
-			user, ok := forge.VerifyTokenString(token, s.secret, s.tokenStore)
+			user, ok := smeldr.VerifyTokenString(token, s.secret, s.tokenStore)
 			if !ok {
 				s.writeOAuthChallenge(w)
 				return
 			}
-			forgeCtx = forge.NewContextWithUser(user)
+			forgeCtx = smeldr.NewContextWithUser(user)
 		} else {
 			s.writeOAuthChallenge(w)
 			return
 		}
 	} else if len(s.secret) > 0 {
 		// Forge bearer token mode.
-		user, ok := forge.VerifyBearerToken(r, s.secret, s.tokenStore)
+		user, ok := smeldr.VerifyBearerToken(r, s.secret, s.tokenStore)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		forgeCtx = forge.NewContextWithUser(user)
+		forgeCtx = smeldr.NewContextWithUser(user)
 	} else {
 		// No authentication configured: treat caller as GuestUser.
-		forgeCtx = forge.NewContextWithUser(forge.GuestUser)
+		forgeCtx = smeldr.NewContextWithUser(smeldr.GuestUser)
 	}
 
 	// Body limit: protect against large payloads.
@@ -274,19 +274,19 @@ func extractBearerToken(r *http.Request) string {
 
 // oauthScopeToRole maps an OAuth scope string to a Forge role.
 //
-//	"mcp:admin"      → forge.Admin
-//	all other values → forge.Author  (standard forge-operator scope for AI clients)
+//	"mcp:admin"      → smeldr.Admin
+//	all other values → smeldr.Author  (standard forge-operator scope for AI clients)
 //
 // The scope "offline_access" is a modifier (enables refresh tokens) and does
 // not affect role mapping — it is combined with the primary scope as a
 // space-separated string (e.g. "mcp offline_access" → Author).
-func oauthScopeToRole(scope string) forge.Role {
+func oauthScopeToRole(scope string) smeldr.Role {
 	for _, s := range strings.Fields(scope) {
 		if s == "mcp:admin" {
-			return forge.Admin
+			return smeldr.Admin
 		}
 	}
-	return forge.Author
+	return smeldr.Author
 }
 
 // writeOAuthChallenge writes HTTP 401 Unauthorized with a WWW-Authenticate

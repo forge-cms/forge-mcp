@@ -25,7 +25,7 @@ type resourceTemplate struct {
 // handleResourcesList returns all Published items from MCPRead modules as MCP
 // resources. Lifecycle enforcement (Published-only) is unconditional and
 // delegated to allResources.
-func (s *Server) handleResourcesList(ctx forge.Context) any {
+func (s *Server) handleResourcesList(ctx smeldr.Context) any {
 	return map[string]any{"resources": s.allResources(ctx)}
 }
 
@@ -34,7 +34,7 @@ func (s *Server) handleResourcesList(ctx forge.Context) any {
 func (s *Server) handleResourcesTemplatesList() any {
 	var templates []resourceTemplate
 	for _, m := range s.modules {
-		if !hasMCPOp(m, forge.MCPRead) {
+		if !hasMCPOp(m, smeldr.MCPRead) {
 			continue
 		}
 		meta := m.MCPMeta()
@@ -52,9 +52,9 @@ func (s *Server) handleResourcesTemplatesList() any {
 // It iterates all MCPRead modules and matches on the module's prefix.
 // Returns (nil, "", false) for an unknown prefix, empty slug, or a slug
 // that contains extra path segments.
-func (s *Server) parseResourceURI(uri string) (forge.MCPModule, string, bool) {
+func (s *Server) parseResourceURI(uri string) (smeldr.MCPModule, string, bool) {
 	for _, m := range s.modules {
-		if !hasMCPOp(m, forge.MCPRead) {
+		if !hasMCPOp(m, smeldr.MCPRead) {
 			continue
 		}
 		prefix := m.MCPMeta().Prefix
@@ -70,7 +70,7 @@ func (s *Server) parseResourceURI(uri string) (forge.MCPModule, string, bool) {
 // handleResourcesRead returns the JSON content of a single Published item
 // identified by its forge:// URI. Returns a -32001 error if the URI is
 // malformed, the item does not exist, or the item is not Published.
-func (s *Server) handleResourcesRead(ctx forge.Context, params json.RawMessage) (any, *jsonRPCError) {
+func (s *Server) handleResourcesRead(ctx smeldr.Context, params json.RawMessage) (any, *jsonRPCError) {
 	var p struct {
 		URI string `json:"uri"`
 	}
@@ -89,8 +89,8 @@ func (s *Server) handleResourcesRead(ctx forge.Context, params json.RawMessage) 
 	}
 
 	// Callers are responsible for lifecycle enforcement. We enforce Published here.
-	type statuser interface{ GetStatus() forge.Status }
-	if st, ok := item.(statuser); !ok || st.GetStatus() != forge.Published {
+	type statuser interface{ GetStatus() smeldr.Status }
+	if st, ok := item.(statuser); !ok || st.GetStatus() != smeldr.Published {
 		return nil, &jsonRPCError{Code: -32001, Message: "resource not found: " + slug}
 	}
 
@@ -111,7 +111,7 @@ func (s *Server) handleResourcesRead(ctx forge.Context, params json.RawMessage) 
 // handleResourceMethod dispatches resource-related JSON-RPC methods.
 // Returns (response, true) when the method is handled, (zero, false) otherwise.
 // This allows the main handle switch in mcp.go to delegate cleanly.
-func (s *Server) handleResourceMethod(ctx forge.Context, req jsonRPCRequest) (jsonRPCResponse, bool) {
+func (s *Server) handleResourceMethod(ctx smeldr.Context, req jsonRPCRequest) (jsonRPCResponse, bool) {
 	switch req.Method {
 	case "resources/list":
 		return jsonRPCResponse{
@@ -151,7 +151,7 @@ func (s *Server) handleResourceMethod(ctx forge.Context, req jsonRPCRequest) (js
 // of the calling SSE session. The session ID is read from the request's
 // session_id query parameter. No-ops silently when the subscriptions registry
 // is nil or no session_id is present.
-func (s *Server) handleResourcesSubscribe(ctx forge.Context, params json.RawMessage) (any, *jsonRPCError) {
+func (s *Server) handleResourcesSubscribe(ctx smeldr.Context, params json.RawMessage) (any, *jsonRPCError) {
 	var p struct {
 		URI string `json:"uri"`
 	}
@@ -176,7 +176,7 @@ func (s *Server) handleResourcesSubscribe(ctx forge.Context, params json.RawMess
 // handleResourcesUnsubscribe removes a subscription for the given URI from the
 // calling SSE session. The session ID is read from the request's session_id
 // query parameter. No-ops silently when the registry is nil or session_id absent.
-func (s *Server) handleResourcesUnsubscribe(ctx forge.Context, params json.RawMessage) (any, *jsonRPCError) {
+func (s *Server) handleResourcesUnsubscribe(ctx smeldr.Context, params json.RawMessage) (any, *jsonRPCError) {
 	var p struct {
 		URI string `json:"uri"`
 	}

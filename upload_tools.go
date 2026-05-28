@@ -26,8 +26,8 @@ func isUploadTool(name string) bool { return name == "create_upload_token" }
 
 // handleUploadTool executes the create_upload_token tool.
 // Requires Author role (verified by the caller in tool.go before dispatch).
-// app is the forge.App passed to [New]; it carries GenerateUploadToken and BaseURL.
-func (s *Server) handleUploadTool(app *forge.App, name string) (any, *jsonRPCError) {
+// app is the smeldr.App passed to [New]; it carries GenerateUploadToken and BaseURL.
+func (s *Server) handleUploadTool(app *smeldr.App, name string) (any, *jsonRPCError) {
 	if name != "create_upload_token" {
 		return nil, &jsonRPCError{Code: -32601, Message: "unknown upload tool: " + name}
 	}

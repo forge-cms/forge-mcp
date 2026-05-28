@@ -24,7 +24,7 @@ import (
 // It exercises: required fields, min constraints, a numeric field, a
 // json: tag override, and the embedded Node.
 type testMCPPost struct {
-	forge.Node
+	smeldr.Node
 	Title  string `forge:"required,min=3"`
 	Body   string `forge:"required,min=10"`
 	Rating int
@@ -32,19 +32,19 @@ type testMCPPost struct {
 }
 
 // newTestApp creates a minimal App with a single /posts module.
-// Pass forge.Option values (e.g. forge.MCP(...)) to configure the module.
-func newTestApp(t *testing.T, opts ...forge.Option) *forge.App {
+// Pass smeldr.Option values (e.g. smeldr.MCP(...)) to configure the module.
+func newTestApp(t *testing.T, opts ...smeldr.Option) *smeldr.App {
 	t.Helper()
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	posts := forge.NewModule(
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	posts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
 	)
 	app.Content(posts, opts...)
 	return app
@@ -53,10 +53,10 @@ func newTestApp(t *testing.T, opts ...forge.Option) *forge.App {
 // seedPost saves a testMCPPost with the given slug, status, title, and body
 // directly into repo, bypassing lifecycle methods. This avoids a dependency
 // on MCPPublish (Step 3) when setting up resource tests.
-func seedPost(t *testing.T, repo *forge.MemoryRepo[*testMCPPost], slug string, status forge.Status, title, body string) *testMCPPost {
+func seedPost(t *testing.T, repo *smeldr.MemoryRepo[*testMCPPost], slug string, status smeldr.Status, title, body string) *testMCPPost {
 	t.Helper()
 	post := &testMCPPost{
-		Node:  forge.Node{ID: forge.NewID(), Slug: slug, Status: status},
+		Node:  smeldr.Node{ID: smeldr.NewID(), Slug: slug, Status: status},
 		Title: title,
 		Body:  body,
 	}
@@ -67,37 +67,37 @@ func seedPost(t *testing.T, repo *forge.MemoryRepo[*testMCPPost], slug string, s
 	return post
 }
 
-// newTestCtx returns a forge.Context fit for MCPModule method calls.
-func newTestCtx() forge.Context {
-	return forge.NewTestContext(forge.GuestUser)
+// newTestCtx returns a smeldr.Context fit for MCPModule method calls.
+func newTestCtx() smeldr.Context {
+	return smeldr.NewTestContext(smeldr.GuestUser)
 }
 
 // TestNewServer verifies that New collects MCPModule values from the App.
 func TestNewServer(t *testing.T) {
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
 
 	// Two modules with MCP, one without.
-	posts := forge.NewModule(
+	posts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
-	drafts := forge.NewModule(
+	drafts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
-		forge.At("/drafts"),
-		forge.MCP(forge.MCPWrite),
+		smeldr.Repo(smeldr.NewMemoryRepo[*testMCPPost]()),
+		smeldr.At("/drafts"),
+		smeldr.MCP(smeldr.MCPWrite),
 	)
-	noMCP := forge.NewModule(
+	noMCP := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
-		forge.At("/other"),
+		smeldr.Repo(smeldr.NewMemoryRepo[*testMCPPost]()),
+		smeldr.At("/other"),
 	)
 	app.Content(posts)
 	app.Content(drafts)
@@ -114,7 +114,7 @@ func TestNewServer(t *testing.T) {
 
 // TestInputSchema verifies that inputSchema produces correct JSON Schema output.
 func TestInputSchema(t *testing.T) {
-	fields := []forge.MCPField{
+	fields := []smeldr.MCPField{
 		{Name: "Title", JSONName: "title", Type: "string", Required: true, MinLength: 3, MaxLength: 100},
 		{Name: "Body", JSONName: "body", Type: "string"},
 		{Name: "Rating", JSONName: "rating", Type: "number"},
@@ -162,7 +162,7 @@ func TestInputSchema(t *testing.T) {
 // {"type":"string","format":"date-time"} in both inputSchema and
 // inputSchemaUpdate, satisfying the JSON Schema specification.
 func TestInputSchema_datetimeField(t *testing.T) {
-	fields := []forge.MCPField{
+	fields := []smeldr.MCPField{
 		{Name: "PublishedAt", JSONName: "published_at", Type: "datetime"},
 		{Name: "ScheduledAt", JSONName: "scheduled_at", Type: "datetime"},
 	}
@@ -198,22 +198,22 @@ func TestInputSchema_datetimeField(t *testing.T) {
 // TestMCPResourcesList verifies that resources/list returns only Published items
 // and formats URIs as forge://{prefix}/{slug}.
 func TestMCPResourcesList(t *testing.T) {
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	mod := forge.NewModule(
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	mod := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
 	app.Content(mod)
 
-	seedPost(t, repo, "published-post", forge.Published, "Published Post", "body content here")
-	seedPost(t, repo, "draft-post", forge.Draft, "Draft Post", "body content here")
+	seedPost(t, repo, "published-post", smeldr.Published, "Published Post", "body content here")
+	seedPost(t, repo, "draft-post", smeldr.Draft, "Draft Post", "body content here")
 
 	srv := New(app)
 	ctx := newTestCtx()
@@ -239,21 +239,21 @@ func TestMCPResourcesList(t *testing.T) {
 // JSON-encoded content for a Published item.
 // Flag D pattern: item fields are inspected via JSON round-trip to map[string]any.
 func TestMCPResourcesRead_published(t *testing.T) {
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	mod := forge.NewModule(
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	mod := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
 	app.Content(mod)
 
-	seedPost(t, repo, "hello-world", forge.Published, "Hello World", "body content here")
+	seedPost(t, repo, "hello-world", smeldr.Published, "Hello World", "body content here")
 
 	srv := New(app)
 	ctx := newTestCtx()
@@ -290,21 +290,21 @@ func TestMCPResourcesRead_published(t *testing.T) {
 // TestMCPResourcesRead_draft verifies that resources/read returns a -32001 error
 // for a Draft item (lifecycle enforcement).
 func TestMCPResourcesRead_draft(t *testing.T) {
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	mod := forge.NewModule(
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	mod := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
 	app.Content(mod)
 
-	seedPost(t, repo, "draft-item", forge.Draft, "Draft Item", "body content here")
+	seedPost(t, repo, "draft-item", smeldr.Draft, "Draft Item", "body content here")
 
 	srv := New(app)
 	ctx := newTestCtx()
@@ -322,29 +322,29 @@ func TestMCPResourcesRead_draft(t *testing.T) {
 // TestMCPResourcesTemplatesList verifies that resources/templates/list returns
 // exactly one template per MCPRead module with the correct URITemplate format.
 func TestMCPResourcesTemplatesList(t *testing.T) {
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	app.Content(forge.NewModule(
+	app := smeldr.New(cfg)
+	app.Content(smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(smeldr.NewMemoryRepo[*testMCPPost]()),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	))
-	app.Content(forge.NewModule(
+	app.Content(smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
-		forge.At("/news"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(smeldr.NewMemoryRepo[*testMCPPost]()),
+		smeldr.At("/news"),
+		smeldr.MCP(smeldr.MCPRead),
 	))
 	// MCPWrite-only module — must not appear in templates list.
-	app.Content(forge.NewModule(
+	app.Content(smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
-		forge.At("/writeonly"),
-		forge.MCP(forge.MCPWrite),
+		smeldr.Repo(smeldr.NewMemoryRepo[*testMCPPost]()),
+		smeldr.At("/writeonly"),
+		smeldr.MCP(smeldr.MCPWrite),
 	))
 
 	srv := New(app)
@@ -375,27 +375,27 @@ func TestMCPResourcesTemplatesList(t *testing.T) {
 	}
 }
 
-// newAuthorCtx returns a forge.Context with Author role for write operations.
-func newAuthorCtx() forge.Context {
-	return forge.NewTestContext(forge.User{ID: "u1", Roles: []forge.Role{forge.Author}})
+// newAuthorCtx returns a smeldr.Context with Author role for write operations.
+func newAuthorCtx() smeldr.Context {
+	return smeldr.NewTestContext(smeldr.User{ID: "u1", Roles: []smeldr.Role{smeldr.Author}})
 }
 
 // newWriteApp creates an App with a single /posts module registered with MCPWrite.
 // Returns both the App and the underlying repo so tests can seed items directly.
-func newWriteApp(t *testing.T, opts ...forge.Option) (*forge.App, *forge.MemoryRepo[*testMCPPost]) {
+func newWriteApp(t *testing.T, opts ...smeldr.Option) (*smeldr.App, *smeldr.MemoryRepo[*testMCPPost]) {
 	t.Helper()
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	allOpts := append([]forge.Option{
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPWrite),
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	allOpts := append([]smeldr.Option{
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPWrite),
 	}, opts...)
-	posts := forge.NewModule((*testMCPPost)(nil), allOpts...)
+	posts := smeldr.NewModule((*testMCPPost)(nil), allOpts...)
 	app.Content(posts)
 	return app, repo
 }
@@ -487,13 +487,13 @@ func TestMCPToolsList(t *testing.T) {
 
 	// MCPRead-only module must NOT contribute module-scoped tools.
 	// create_preview_url and create_upload_token are always available (not module-scoped).
-	cfg := forge.Config{BaseURL: "http://localhost", Secret: []byte("test-secret-32-bytes-xxxxxxxxxxxx")}
-	app2 := forge.New(cfg)
-	app2.Content(forge.NewModule(
+	cfg := smeldr.Config{BaseURL: "http://localhost", Secret: []byte("test-secret-32-bytes-xxxxxxxxxxxx")}
+	app2 := smeldr.New(cfg)
+	app2.Content(smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
-		forge.At("/readonly"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(smeldr.NewMemoryRepo[*testMCPPost]()),
+		smeldr.At("/readonly"),
+		smeldr.MCP(smeldr.MCPRead),
 	))
 	srv2 := New(app2)
 	res2 := srv2.handleToolsList()
@@ -586,7 +586,7 @@ func TestMCPToolsCall_publish(t *testing.T) {
 	ctx := newAuthorCtx()
 
 	t0 := time.Now().UTC().Add(-time.Second)
-	seedPost(t, repo, "my-post", forge.Draft, "My Post", "body content here ok")
+	seedPost(t, repo, "my-post", smeldr.Draft, "My Post", "body content here ok")
 
 	params, _ := json.Marshal(map[string]any{
 		"name":      "publish_test_mcp_post",
@@ -606,7 +606,7 @@ func TestMCPToolsCall_publish(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindBySlug: %v", err)
 	}
-	if stored.Status != forge.Published {
+	if stored.Status != smeldr.Published {
 		t.Errorf("stored status = %q, want Published", stored.Status)
 	}
 	if stored.PublishedAt.IsZero() {
@@ -622,7 +622,7 @@ func TestMCPToolsCall_publish(t *testing.T) {
 // (Flag H idempotency).
 func TestMCPToolsCall_publish_already_published(t *testing.T) {
 	var fired int32
-	app, repo := newWriteApp(t, forge.On(forge.AfterPublish, func(_ forge.Context, _ *testMCPPost) error {
+	app, repo := newWriteApp(t, smeldr.On(smeldr.AfterPublish, func(_ smeldr.Context, _ *testMCPPost) error {
 		atomic.AddInt32(&fired, 1)
 		return nil
 	}))
@@ -630,7 +630,7 @@ func TestMCPToolsCall_publish_already_published(t *testing.T) {
 	ctx := newAuthorCtx()
 
 	// Seed an already-Published item — AfterPublish was NOT fired during seed.
-	seedPost(t, repo, "live-post", forge.Published, "Live Post", "body content here ok")
+	seedPost(t, repo, "live-post", smeldr.Published, "Live Post", "body content here ok")
 
 	params, _ := json.Marshal(map[string]any{
 		"name":      "publish_test_mcp_post",
@@ -656,7 +656,7 @@ func TestMCPToolsCall_schedule(t *testing.T) {
 	srv := New(app)
 	ctx := newAuthorCtx()
 
-	seedPost(t, repo, "sched-post", forge.Draft, "Sched Post", "body content here ok")
+	seedPost(t, repo, "sched-post", smeldr.Draft, "Sched Post", "body content here ok")
 	futureStr := time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339)
 
 	params, _ := json.Marshal(map[string]any{
@@ -683,7 +683,7 @@ func TestMCPToolsCall_schedule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindBySlug: %v", err)
 	}
-	if stored.Status != forge.Scheduled {
+	if stored.Status != smeldr.Scheduled {
 		t.Errorf("stored status = %q, want Scheduled", stored.Status)
 	}
 	if stored.ScheduledAt == nil {
@@ -698,7 +698,7 @@ func TestMCPToolsCall_archive(t *testing.T) {
 	srv := New(app)
 	ctx := newAuthorCtx()
 
-	seedPost(t, repo, "arch-post", forge.Published, "Arch Post", "body content here ok")
+	seedPost(t, repo, "arch-post", smeldr.Published, "Arch Post", "body content here ok")
 
 	params, _ := json.Marshal(map[string]any{
 		"name":      "archive_test_mcp_post",
@@ -717,7 +717,7 @@ func TestMCPToolsCall_archive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindBySlug: %v", err)
 	}
-	if stored.Status != forge.Archived {
+	if stored.Status != smeldr.Archived {
 		t.Errorf("stored status = %q, want Archived", stored.Status)
 	}
 }
@@ -730,7 +730,7 @@ func TestMCPToolsCall_delete(t *testing.T) {
 	srv := New(app)
 	ctx := newEditorCtx()
 
-	seedPost(t, repo, "del-post", forge.Draft, "Del Post", "body content here ok")
+	seedPost(t, repo, "del-post", smeldr.Draft, "Del Post", "body content here ok")
 
 	params, _ := json.Marshal(map[string]any{
 		"name":      "delete_test_mcp_post",
@@ -791,7 +791,7 @@ func TestMCPToolsCall_update_cannot_clear_field(t *testing.T) {
 	srv := New(app)
 	ctx := newAuthorCtx()
 
-	seedPost(t, repo, "upd-post", forge.Draft, "Original Title", "original body content ok")
+	seedPost(t, repo, "upd-post", smeldr.Draft, "Original Title", "original body content ok")
 
 	// Attempt to clear Body by passing an empty string.
 	// Body has required,min=10 — the overlay will produce a validation error,
@@ -860,7 +860,7 @@ func mcpRoundTrip(t *testing.T, srv *Server, reqObj map[string]any) map[string]a
 }
 
 func TestMCPServeStdio_roundtrip(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	srv := New(app)
 
 	resp := mcpRoundTrip(t, srv, map[string]any{
@@ -883,21 +883,21 @@ func TestMCPServeStdio_roundtrip(t *testing.T) {
 }
 
 func TestMCPServeStdio_resourcesList(t *testing.T) {
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	posts := forge.NewModule(
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	posts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
 	app.Content(posts)
-	seedPost(t, repo, "hello-world", forge.Published, "Hello World", "body content here")
-	seedPost(t, repo, "draft-post", forge.Draft, "Draft Post", "draft content here")
+	seedPost(t, repo, "hello-world", smeldr.Published, "Hello World", "body content here")
+	seedPost(t, repo, "draft-post", smeldr.Draft, "Draft Post", "draft content here")
 
 	srv := New(app)
 	resp := mcpRoundTrip(t, srv, map[string]any{
@@ -925,7 +925,7 @@ func TestMCPServeStdio_resourcesList(t *testing.T) {
 }
 
 func TestMCPServeStdio_malformedJSON(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	srv := New(app)
 
 	pr, pw := io.Pipe()
@@ -961,7 +961,7 @@ func TestMCPServeStdio_malformedJSON(t *testing.T) {
 }
 
 func TestMCPServeStdio_emptyLine(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	srv := New(app)
 
 	pr, pw := io.Pipe()
@@ -1001,7 +1001,7 @@ func TestMCPServeStdio_emptyLine(t *testing.T) {
 }
 
 func TestMCPServeStdio_contextCancel(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	srv := New(app)
 
 	// Use a non-closing reader so ServeStdio blocks on the scanner goroutine.
@@ -1026,14 +1026,14 @@ func TestMCPServeStdio_contextCancel(t *testing.T) {
 
 func TestMCPHandler_initialize(t *testing.T) {
 	// Use WithSecret([]byte{}) so the server applies no auth (GuestUser path).
-	cfg := forge.Config{BaseURL: "http://localhost", Secret: []byte("test-secret-32-bytes-xxxxxxxxxxxx")}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	posts := forge.NewModule(
+	cfg := smeldr.Config{BaseURL: "http://localhost", Secret: []byte("test-secret-32-bytes-xxxxxxxxxxxx")}
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	posts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
 	app.Content(posts)
 	srv := New(app, WithSecret([]byte{})) // empty secret → GuestUser path
@@ -1065,17 +1065,17 @@ func TestMCPHandler_initialize(t *testing.T) {
 func TestMCPHandler_unauthenticated(t *testing.T) {
 	// Construct server with a non-empty secret so auth is enforced.
 	secret := []byte("test-secret-32-bytes-xxxxxxxxxxxx")
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  secret,
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	posts := forge.NewModule(
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	posts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead, forge.MCPWrite),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead, smeldr.MCPWrite),
 	)
 	app.Content(posts)
 	srv := New(app) // auto-inherits secret
@@ -1093,23 +1093,23 @@ func TestMCPHandler_unauthenticated(t *testing.T) {
 
 func TestMCPHandler_authenticated_resourcesList(t *testing.T) {
 	secret := []byte("test-secret-32-bytes-xxxxxxxxxxxx")
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  secret,
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	posts := forge.NewModule(
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	posts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
 	app.Content(posts)
-	seedPost(t, repo, "auth-post", forge.Published, "Auth Post", "some body content here")
+	seedPost(t, repo, "auth-post", smeldr.Published, "Auth Post", "some body content here")
 
-	adminUser := forge.User{ID: "admin", Roles: []forge.Role{forge.Admin}}
-	tok, err := forge.SignToken(adminUser, string(secret), 0)
+	adminUser := smeldr.User{ID: "admin", Roles: []smeldr.Role{smeldr.Admin}}
+	tok, err := smeldr.SignToken(adminUser, string(secret), 0)
 	if err != nil {
 		t.Fatalf("SignToken: %v", err)
 	}
@@ -1140,14 +1140,14 @@ func TestMCPHandler_authenticated_resourcesList(t *testing.T) {
 
 func TestMCPHandler_bodyTooLarge(t *testing.T) {
 	// Use WithSecret([]byte{}) so the server applies no auth (GuestUser path).
-	cfg := forge.Config{BaseURL: "http://localhost", Secret: []byte("test-secret-32-bytes-xxxxxxxxxxxx")}
-	appNoSecret := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testMCPPost]()
-	posts := forge.NewModule(
+	cfg := smeldr.Config{BaseURL: "http://localhost", Secret: []byte("test-secret-32-bytes-xxxxxxxxxxxx")}
+	appNoSecret := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testMCPPost]()
+	posts := smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.Repo(repo),
-		forge.At("/posts"),
-		forge.MCP(forge.MCPRead),
+		smeldr.Repo(repo),
+		smeldr.At("/posts"),
+		smeldr.MCP(smeldr.MCPRead),
 	)
 	appNoSecret.Content(posts)
 	srv := New(appNoSecret, WithSecret([]byte{})) // empty secret → GuestUser path
@@ -1167,7 +1167,7 @@ func TestMCPHandler_bodyTooLarge(t *testing.T) {
 }
 
 func TestMCPHandler_SSEOpen(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	srv := New(app)
 
 	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
@@ -1202,11 +1202,11 @@ func ExampleNew() {
 	if secret == "" {
 		secret = "example-placeholder-secret-32byt" // 32-byte fallback for example
 	}
-	app := forge.New(forge.Config{
+	app := smeldr.New(smeldr.Config{
 		BaseURL: "https://example.com",
 		Secret:  []byte(secret),
 	})
-	// app.Content(..., forge.MCP(forge.MCPWrite))
+	// app.Content(..., smeldr.MCP(smeldr.MCPWrite))
 	srv := New(app)
 	_ = srv
 	// Output:
@@ -1218,7 +1218,7 @@ func ExampleNew() {
 // inputSchema to emit {"type":"array","items":{"type":"string"}} and suppresses
 // minLength/maxLength/enum constraints (Amendment A52-2).
 func TestInputSchema_arrayField(t *testing.T) {
-	fields := []forge.MCPField{
+	fields := []smeldr.MCPField{
 		{Name: "Title", JSONName: "title", Type: "string", Required: true, MinLength: 3},
 		{Name: "Tags", JSONName: "tags", Type: "array"},
 	}
@@ -1250,7 +1250,7 @@ func TestInputSchema_arrayField(t *testing.T) {
 // TestInputSchema_description verifies the three priority rules for the
 // "description" key in JSON Schema properties (Decision 27).
 func TestInputSchema_description(t *testing.T) {
-	fields := []forge.MCPField{
+	fields := []smeldr.MCPField{
 		{Name: "Body", JSONName: "body", Type: "string", Format: "markdown", Description: "Write content in Markdown."},
 		{Name: "Embed", JSONName: "embed", Type: "string", Format: "html"},
 		{Name: "Title", JSONName: "title", Type: "string"},
@@ -1288,7 +1288,7 @@ func TestInputSchema_description(t *testing.T) {
 // TestInputSchemaUpdate_description verifies description hints are applied in
 // the update schema as well (Decision 27).
 func TestInputSchemaUpdate_description(t *testing.T) {
-	fields := []forge.MCPField{
+	fields := []smeldr.MCPField{
 		{Name: "Body", JSONName: "body", Type: "string", Format: "markdown", Description: "Write in Markdown."},
 	}
 	schema := inputSchemaUpdate(fields)
@@ -1308,9 +1308,9 @@ func TestInputSchemaUpdate_description(t *testing.T) {
 
 // — Admin read tools —————————————————————————————————————————————————————
 
-// newEditorCtx returns a forge.Context with Editor role for admin read operations.
-func newEditorCtx() forge.Context {
-	return forge.NewTestContext(forge.User{ID: "e1", Roles: []forge.Role{forge.Editor}})
+// newEditorCtx returns a smeldr.Context with Editor role for admin read operations.
+func newEditorCtx() smeldr.Context {
+	return smeldr.NewTestContext(smeldr.User{ID: "e1", Roles: []smeldr.Role{smeldr.Editor}})
 }
 
 // TestMCPAdminReadToolDefs verifies that mcpAdminReadToolDefs generates the
@@ -1343,9 +1343,9 @@ func TestMCPToolsCall_list_all(t *testing.T) {
 	srv := New(app)
 	ctx := newEditorCtx()
 
-	seedPost(t, repo, "post-draft", forge.Draft, "Draft Post", "body content here ok")
-	seedPost(t, repo, "post-pub", forge.Published, "Published Post", "body content here ok")
-	seedPost(t, repo, "post-arch", forge.Archived, "Archived Post", "body content here ok")
+	seedPost(t, repo, "post-draft", smeldr.Draft, "Draft Post", "body content here ok")
+	seedPost(t, repo, "post-pub", smeldr.Published, "Published Post", "body content here ok")
+	seedPost(t, repo, "post-arch", smeldr.Archived, "Archived Post", "body content here ok")
 
 	params, _ := json.Marshal(map[string]any{
 		"name":      "list_test_mcp_posts",
@@ -1369,9 +1369,9 @@ func TestMCPToolsCall_list_filtered(t *testing.T) {
 	srv := New(app)
 	ctx := newEditorCtx()
 
-	seedPost(t, repo, "d1", forge.Draft, "Draft 1", "body content here ok")
-	seedPost(t, repo, "d2", forge.Draft, "Draft 2", "body content here ok")
-	seedPost(t, repo, "p1", forge.Published, "Published 1", "body content here ok")
+	seedPost(t, repo, "d1", smeldr.Draft, "Draft 1", "body content here ok")
+	seedPost(t, repo, "d2", smeldr.Draft, "Draft 2", "body content here ok")
+	seedPost(t, repo, "p1", smeldr.Published, "Published 1", "body content here ok")
 
 	params, _ := json.Marshal(map[string]any{
 		"name":      "list_test_mcp_posts",
@@ -1395,7 +1395,7 @@ func TestMCPToolsCall_get_draft(t *testing.T) {
 	srv := New(app)
 	ctx := newEditorCtx()
 
-	seedPost(t, repo, "hidden-draft", forge.Draft, "Hidden Draft", "body content here ok")
+	seedPost(t, repo, "hidden-draft", smeldr.Draft, "Hidden Draft", "body content here ok")
 
 	params, _ := json.Marshal(map[string]any{
 		"name":      "get_test_mcp_post",
@@ -1439,7 +1439,7 @@ func TestMCPToolsCall_admin_read_forbidden_author(t *testing.T) {
 	srv := New(app)
 	authorCtx := newAuthorCtx()
 
-	seedPost(t, repo, "some-post", forge.Published, "Some Post", "body content here ok")
+	seedPost(t, repo, "some-post", smeldr.Published, "Some Post", "body content here ok")
 
 	for _, tc := range []struct {
 		toolName string
@@ -1485,12 +1485,12 @@ func TestMCPToolsCall_list_empty(t *testing.T) {
 
 // — Token management tools ————————————————————————————————————————————————
 
-// newAdminCtx returns a forge.Context with Admin role for token management tests.
-func newAdminCtx() forge.Context {
-	return forge.NewTestContext(forge.User{ID: "admin1", Roles: []forge.Role{forge.Admin}})
+// newAdminCtx returns a smeldr.Context with Admin role for token management tests.
+func newAdminCtx() smeldr.Context {
+	return smeldr.NewTestContext(smeldr.User{ID: "admin1", Roles: []smeldr.Role{smeldr.Admin}})
 }
 
-// tokenTestDB is a forge.DB stub for token management tool tests.
+// tokenTestDB is a smeldr.DB stub for token management tool tests.
 // ExecContext handles INSERT (Create) and UPDATE (Revoke).
 // QueryContext returns empty *sql.Rows via sql.OpenDB.
 type tokenTestDB struct {
@@ -1552,16 +1552,16 @@ func (*emptyRowConn) Columns() []string {
 func (*emptyRowConn) Next(_ []driver.Value) error { return io.EOF }
 
 // newTokenApp returns an App + Server wired with a TokenStore using tokenTestDB.
-func newTokenApp(t *testing.T) (*forge.App, *tokenTestDB) {
+func newTokenApp(t *testing.T) (*smeldr.App, *tokenTestDB) {
 	t.Helper()
 	db := &tokenTestDB{}
-	ts := forge.NewTokenStore(db, "test-secret-32-bytes-xxxxxxxxxxxx")
-	cfg := forge.Config{
+	ts := smeldr.NewTokenStore(db, "test-secret-32-bytes-xxxxxxxxxxxx")
+	cfg := smeldr.Config{
 		BaseURL:    "http://localhost",
 		Secret:     []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 		TokenStore: ts,
 	}
-	app := forge.New(cfg)
+	app := smeldr.New(cfg)
 	return app, db
 }
 
@@ -1706,34 +1706,34 @@ func TestTokenToolRevokeToken(t *testing.T) {
 
 // testSinglePage is a minimal content type for SingleInstance preview URL tests.
 type testSinglePage struct {
-	forge.Node
+	smeldr.Node
 	Title string `forge:"required"`
 }
 
 // TestPreviewURL_SingleInstance verifies that create_preview_url returns a
 // path without a slug segment for SingleInstance modules.
 func TestPreviewURL_SingleInstance(t *testing.T) {
-	cfg := forge.Config{
+	cfg := smeldr.Config{
 		BaseURL: "http://localhost",
 		Secret:  []byte("test-secret-32-bytes-xxxxxxxxxxxx"),
 	}
-	app := forge.New(cfg)
-	repo := forge.NewMemoryRepo[*testSinglePage]()
+	app := smeldr.New(cfg)
+	repo := smeldr.NewMemoryRepo[*testSinglePage]()
 
 	// SingleInstance module at /homepage.
-	app.Content(forge.NewModule(
+	app.Content(smeldr.NewModule(
 		(*testSinglePage)(nil),
-		forge.At("/homepage"),
-		forge.Repo(repo),
-		forge.MCP(forge.MCPRead, forge.MCPWrite),
-		forge.SingleInstance(),
+		smeldr.At("/homepage"),
+		smeldr.Repo(repo),
+		smeldr.MCP(smeldr.MCPRead, smeldr.MCPWrite),
+		smeldr.SingleInstance(),
 	))
 	// Normal module at /posts for the unchanged-path assertion.
-	app.Content(forge.NewModule(
+	app.Content(smeldr.NewModule(
 		(*testMCPPost)(nil),
-		forge.At("/posts"),
-		forge.Repo(forge.NewMemoryRepo[*testMCPPost]()),
-		forge.MCP(forge.MCPRead, forge.MCPWrite),
+		smeldr.At("/posts"),
+		smeldr.Repo(smeldr.NewMemoryRepo[*testMCPPost]()),
+		smeldr.MCP(smeldr.MCPRead, smeldr.MCPWrite),
 	))
 
 	srv := New(app)
@@ -1816,7 +1816,7 @@ func seedOAuthToken(t *testing.T, store *forgeoauth.SQLiteStore, token, clientID
 // TestOAuth_SSE_NoBearer_Returns401 verifies that GET /mcp returns 401 with a
 // WWW-Authenticate header when OAuth is enabled and no Bearer token is present.
 func TestOAuth_SSE_NoBearer_Returns401(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	oauthSrv, _ := newTestOAuthServer(t)
 	srv := New(app, WithOAuth(oauthSrv))
 
@@ -1837,7 +1837,7 @@ func TestOAuth_SSE_NoBearer_Returns401(t *testing.T) {
 // 401 with a WWW-Authenticate header when OAuth is enabled and no Bearer token
 // is present.
 func TestOAuth_Message_NoBearer_Returns401(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	oauthSrv, _ := newTestOAuthServer(t)
 	srv := New(app, WithOAuth(oauthSrv))
 
@@ -1863,7 +1863,7 @@ func TestOAuth_Message_NoBearer_Returns401(t *testing.T) {
 // GET /.well-known/oauth-protected-resource returns 200 JSON with the
 // authorization_servers field when OAuth is enabled.
 func TestOAuth_ProtectedResourceMetadata(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	oauthSrv, _ := newTestOAuthServer(t)
 	srv := New(app, WithOAuth(oauthSrv))
 
@@ -1894,7 +1894,7 @@ func TestOAuth_ProtectedResourceMetadata(t *testing.T) {
 // TestOAuth_Message_ValidToken_Returns200 verifies that POST /mcp/message with
 // a valid OAuth access token returns a 200 JSON-RPC response.
 func TestOAuth_Message_ValidToken_Returns200(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	oauthSrv, store := newTestOAuthServer(t)
 	seedOAuthToken(t, store, "valid-access-token-001", "https://chatgpt.com", "mcp")
 
@@ -1923,7 +1923,7 @@ func TestOAuth_Message_ValidToken_Returns200(t *testing.T) {
 // GET /.well-known/oauth-protected-resource returns 404 when OAuth is not
 // configured (WithOAuth was not called).
 func TestOAuth_ProtectedResource_NotEnabled_Returns404(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	srv := New(app) // no WithOAuth
 
 	req := httptest.NewRequest(http.MethodGet, "/.well-known/oauth-protected-resource", nil)
@@ -1939,14 +1939,14 @@ func TestOAuth_ProtectedResource_NotEnabled_Returns404(t *testing.T) {
 // WithOAuth and WithForgeFallback are set, a valid forge bearer token is
 // accepted as fallback authentication on POST /mcp/message.
 func TestForgeFallback_ValidForgeBearer_Returns200(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	oauthSrv, _ := newTestOAuthServer(t)
 	srv := New(app, WithOAuth(oauthSrv), WithForgeFallback())
 
 	// Sign a valid forge bearer token using the test app's secret.
 	secret := []byte("test-secret-32-bytes-xxxxxxxxxxxx")
-	user := forge.User{ID: "desktop-client", Roles: []forge.Role{forge.Author}}
-	tok, err := forge.SignToken(user, string(secret), 0)
+	user := smeldr.User{ID: "desktop-client", Roles: []smeldr.Role{smeldr.Author}}
+	tok, err := smeldr.SignToken(user, string(secret), 0)
 	if err != nil {
 		t.Fatalf("SignToken: %v", err)
 	}
@@ -1967,14 +1967,14 @@ func TestForgeFallback_ValidForgeBearer_Returns200(t *testing.T) {
 // only WithOAuth is set (no WithForgeFallback), a forge bearer token is rejected
 // with HTTP 401 — the fallback path is not active.
 func TestForgeFallback_WithoutFallback_ForgeBearer_Returns401(t *testing.T) {
-	app := newTestApp(t, forge.MCP(forge.MCPRead))
+	app := newTestApp(t, smeldr.MCP(smeldr.MCPRead))
 	oauthSrv, _ := newTestOAuthServer(t)
 	srv := New(app, WithOAuth(oauthSrv)) // no WithForgeFallback
 
 	// Sign a valid forge bearer token using the test app's secret.
 	secret := []byte("test-secret-32-bytes-xxxxxxxxxxxx")
-	user := forge.User{ID: "desktop-client", Roles: []forge.Role{forge.Author}}
-	tok, err := forge.SignToken(user, string(secret), 0)
+	user := smeldr.User{ID: "desktop-client", Roles: []smeldr.Role{smeldr.Author}}
+	tok, err := smeldr.SignToken(user, string(secret), 0)
 	if err != nil {
 		t.Fatalf("SignToken: %v", err)
 	}
