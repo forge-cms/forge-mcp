@@ -2,7 +2,7 @@
 
 > ✅ **Available** — MCP (Model Context Protocol) server for Forge apps.
 
-`forge-mcp` wraps a `forge.App` and exposes its `MCP`-registered content modules as
+`forge-mcp` wraps a `smeldr.App` and exposes its `MCP`-registered content modules as
 MCP resources and tools, enabling Claude Desktop, Cursor, and any MCP-compatible AI
 assistant to create, read, update, publish, and delete content through the Model
 Context Protocol.
@@ -30,23 +30,23 @@ import (
 	"forge-cms.dev/forge"
 )
 
-// BlogPost is your content type — embed forge.Node and add your fields.
+// BlogPost is your content type — embed smeldr.Node and add your fields.
 type BlogPost struct {
-	forge.Node
+	smeldr.Node
 	Title string `forge:"required" json:"title"`
 	Body  string `forge:"required,min=50" json:"body"`
 }
 
 func main() {
-	app := forge.New(forge.Config{
+	app := smeldr.New(smeldr.Config{
 		BaseURL: "https://mysite.com",
 		Secret:  []byte(os.Getenv("SECRET")),
 	})
 
-	posts := forge.NewModule((*BlogPost)(nil),
-		forge.At("/posts"),
-		forge.Repo(forge.NewMemoryRepo[*BlogPost]()),
-		forge.MCP(forge.MCPWrite), // expose as MCP tools
+	posts := smeldr.NewModule((*BlogPost)(nil),
+		smeldr.At("/posts"),
+		smeldr.Repo(smeldr.NewMemoryRepo[*BlogPost]()),
+		smeldr.MCP(smeldr.MCPWrite), // expose as MCP tools
 	)
 	app.Content(posts)
 
@@ -125,12 +125,12 @@ The SSE handler registers two routes:
 
 ### Getting a token
 
-Use `forge.SignToken` to mint a token with the same HMAC secret as your app:
+Use `smeldr.SignToken` to mint a token with the same HMAC secret as your app:
 
 ```go
-token, err := forge.SignToken(forge.User{
+token, err := smeldr.SignToken(smeldr.User{
 	ID:    "alice",
-	Roles: []forge.Role{forge.Author},
+	Roles: []smeldr.Role{smeldr.Author},
 }, []byte(os.Getenv("SECRET")), 0) // 0 = no expiry
 ```
 
@@ -156,9 +156,9 @@ token, err := forge.SignToken(forge.User{
 Register each module with the operations you want:
 
 ```go
-forge.MCP(forge.MCPRead)                    // read-only access
-forge.MCP(forge.MCPWrite)                   // write-only access
-forge.MCP(forge.MCPRead, forge.MCPWrite)    // full access
+smeldr.MCP(smeldr.MCPRead)                    // read-only access
+smeldr.MCP(smeldr.MCPWrite)                   // write-only access
+smeldr.MCP(smeldr.MCPRead, smeldr.MCPWrite)    // full access
 ```
 
 | MCP method                  | Requires   | Role required | What it does                                                  |
@@ -211,7 +211,7 @@ Published, or Archived.
 **Tool naming:** follows the same snake_case rule as write tools. `BlogPost` → `blog_post`,
 so the list tool is `list_blog_posts` and the get tool is `get_blog_post`.
 
-**Return value:** the full struct including all `forge.Node` fields (`Status`, `PublishedAt`,
+**Return value:** the full struct including all `smeldr.Node` fields (`Status`, `PublishedAt`,
 `ScheduledAt`, `CreatedAt`, `UpdatedAt`, `Slug`, `ID`).
 
 ---
@@ -241,7 +241,7 @@ configured time without any MCP call.
 
 ### stdio transport (ServeStdio)
 
-`ServeStdio` runs with `forge.Admin` privileges. It is designed for **local,
+`ServeStdio` runs with `smeldr.Admin` privileges. It is designed for **local,
 trusted processes only** — any process that can write to stdin has full content
 access. Do not expose the MCP binary's stdin to untrusted processes.
 
@@ -250,12 +250,12 @@ access. Do not expose the MCP binary's stdin to untrusted processes.
 `POST /mcp/message` enforces authentication on every request:
 
 - No `Authorization: Bearer <token>` header → HTTP 401
-- Valid token, but role < `forge.Author` → MCP error -32001 (not HTTP 401;
+- Valid token, but role < `smeldr.Author` → MCP error -32001 (not HTTP 401;
   authentication succeeded, authorisation failed)
-- All `tools/call` operations require `forge.Author` role or above
+- All `tools/call` operations require `smeldr.Author` role or above
 
 Tokens are minted and verified using the same HMAC mechanism as the Forge REST
-API (`forge.BearerHMAC`). A token from `forge.SignToken(user, secret, 0)` is
+API (`smeldr.BearerHMAC`). A token from `smeldr.SignToken(user, secret, 0)` is
 valid for both the REST API and the SSE MCP transport — there is no separate
 token format.
 
