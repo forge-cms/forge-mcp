@@ -114,6 +114,45 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
+// Register mounts all MCP and OAuth routes on a forge [smeldr.App] in one call.
+// It replaces the pattern of calling [smeldr.App.Handle] for each endpoint individually.
+//
+// Registered routes (always):
+//
+//	GET  /mcp                                  — SSE endpoint
+//	POST /mcp                                  — streamable HTTP endpoint
+//	POST /mcp/message                          — SSE transport message endpoint
+//	GET  /.well-known/oauth-protected-resource — RFC 9728 metadata
+//
+// When [WithOAuth] was configured, Register also mounts:
+//
+//	GET  /.well-known/oauth-authorization-server — RFC 8414 metadata
+//	GET  /oauth/authorize                         — authorization form
+//	POST /oauth/authorize                         — form submission
+//	POST /oauth/token                             — code exchange and token refresh
+//	POST /oauth/revoke                            — token revocation (RFC 7009)
+//
+// Register calls [Handler] once to obtain the forgemcp mux and then delegates
+// each route to it via [smeldr.App.Handle]. Go 1.22+ ServeMux priority rules
+// ensure existing forge routes are never overwritten.
+//
+// After Register returns, site-dev should update main.go to use this method
+// instead of five separate app.Handle calls.
+func (s *Server) Register(app *smeldr.App) {
+	h := s.Handler()
+	app.Handle("GET /mcp", h)
+	app.Handle("POST /mcp", h)
+	app.Handle("POST /mcp/message", h)
+	app.Handle("GET /.well-known/oauth-protected-resource", h)
+	if s.oauth != nil {
+		app.Handle("GET /.well-known/oauth-authorization-server", h)
+		app.Handle("GET /oauth/authorize", h)
+		app.Handle("POST /oauth/authorize", h)
+		app.Handle("POST /oauth/token", h)
+		app.Handle("POST /oauth/revoke", h)
+	}
+}
+
 // sseHandler handles GET /mcp, upgrading the HTTP connection to a Server-Sent
 // Events stream. It:
 //  1. Sends an initial "event: open" keepalive for backward compatibility.

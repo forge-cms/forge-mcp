@@ -1,4 +1,4 @@
-package forgemcp
+﻿package forgemcp
 
 import (
 	"bytes"
@@ -25,8 +25,8 @@ import (
 // json: tag override, and the embedded Node.
 type testMCPPost struct {
 	smeldr.Node
-	Title  string `forge:"required,min=3"`
-	Body   string `forge:"required,min=10"`
+	Title  string `smeldr:"required,min=3"`
+	Body   string `smeldr:"required,min=10"`
 	Rating int
 	Tags   string `json:"tags"`
 }
@@ -1707,7 +1707,7 @@ func TestTokenToolRevokeToken(t *testing.T) {
 // testSinglePage is a minimal content type for SingleInstance preview URL tests.
 type testSinglePage struct {
 	smeldr.Node
-	Title string `forge:"required"`
+	Title string `smeldr:"required"`
 }
 
 // TestPreviewURL_SingleInstance verifies that create_preview_url returns a

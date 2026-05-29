@@ -3,8 +3,8 @@ module smeldr.dev/mcp
 go 1.26.3
 
 require (
-	smeldr.dev/core v1.26.0
-	smeldr.dev/oauth v0.1.2
+	smeldr.dev/core v1.30.0
+	smeldr.dev/oauth v0.1.4
 )
 
 require (
