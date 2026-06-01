@@ -3,8 +3,9 @@ module smeldr.dev/mcp
 go 1.26.3
 
 require (
-	smeldr.dev/core v1.30.0
-	smeldr.dev/oauth v0.1.4
+	modernc.org/sqlite v1.50.1
+	smeldr.dev/core v1.31.0
+	smeldr.dev/oauth v0.1.5
 )
 
 require (
@@ -17,5 +18,4 @@ require (
 	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.50.1 // indirect
 )
