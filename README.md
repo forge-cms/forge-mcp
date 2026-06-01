@@ -1,8 +1,8 @@
-# forge-mcp
+# smeldr.dev/mcp
 
-> ✅ **Available** — MCP (Model Context Protocol) server for Forge apps.
+> ✅ **Available** — MCP (Model Context Protocol) server for Smeldr apps.
 
-`forge-mcp` wraps a `smeldr.App` and exposes its `MCP`-registered content modules as
+`smeldr.dev/mcp` wraps a `smeldr.App` and exposes its `MCP`-registered content modules as
 MCP resources and tools, enabling Claude Desktop, Cursor, and any MCP-compatible AI
 assistant to create, read, update, publish, and delete content through the Model
 Context Protocol.
@@ -15,7 +15,7 @@ same code paths as the HTTP layer. There is no special MCP bypass.
 ## Quick start
 
 ```bash
-go get forge-cms.dev/forge-mcp
+go get smeldr.dev/mcp
 ```
 
 ```go
@@ -25,16 +25,16 @@ import (
 	"context"
 	"os"
 
-	forgemcp "forge-cms.dev/forge-mcp"
+	forgemcp "smeldr.dev/mcp"
 
-	"forge-cms.dev/forge"
+	"smeldr.dev/core"
 )
 
 // BlogPost is your content type — embed smeldr.Node and add your fields.
 type BlogPost struct {
 	smeldr.Node
-	Title string `forge:"required" json:"title"`
-	Body  string `forge:"required,min=50" json:"body"`
+	Title string `smeldr:"required" json:"title"`
+	Body  string `smeldr:"required,min=50" json:"body"`
 }
 
 func main() {
@@ -216,6 +216,37 @@ so the list tool is `list_blog_posts` and the get tool is `get_blog_post`.
 
 ---
 
+## Block system tools (`WithBlocks`)
+
+Enable the block-system tools with the `WithBlocks` option. They let an AI operator
+create generic blocks and compose them into pages and collections. The tools read
+and write the `smeldr_dynamic_content` and `smeldr_content_edges` tables — create
+them once at startup with `smeldr.CreateBlockTables(db)`.
+
+```go
+smeldr.CreateBlockTables(db)
+mcpSrv := forgemcp.New(app, forgemcp.WithBlocks())
+```
+
+Blocks are addressed by **ID** (they have no slug) and are not exposed as
+`resources/*` — read them with `get_node` / `list_nodes`.
+
+| Tool | Role | Arguments |
+|------|------|-----------|
+| `create_node` | Author+ | `type_name`, `fields` (object) → `{id, type_name, status, slug}` |
+| `update_node` | Author+ | `id`, `fields` (merged onto stored; `type_name` immutable) |
+| `get_node` | Author+ | `id` |
+| `list_nodes` | Author+ | `type_name?`, `status?` |
+| `publish_node` / `archive_node` | Author+ | `id` (publish idempotent) |
+| `add_section` / `add_item` | Editor+ | `parent_id`, `child_id` (types derived) |
+| `reorder_sections` / `reorder_items` | Editor+ | `parent_id`, `ordered_child_ids` |
+| `remove_section` / `remove_item` | Editor+ | `parent_id`, `child_id` |
+
+Sections (`edge_role` `"section"`) compose pages; items (`"item"`) compose
+collections. The names are distinct for clarity; both share one implementation.
+
+---
+
 ## Lifecycle enforcement
 
 **MCPRead exposes only `Published` items.** Draft, Scheduled, and Archived items
@@ -232,7 +263,7 @@ Draft      → Scheduled  (schedule_{type}, requires scheduled_at RFC 3339)
 Published  → Published  (publish_{type} is idempotent — no error, no duplicate signal)
 ```
 
-The Forge scheduler automatically transitions `Scheduled → Published` at the
+The Smeldr scheduler automatically transitions `Scheduled → Published` at the
 configured time without any MCP call.
 
 ---
@@ -263,7 +294,7 @@ token format.
 
 ## Zero dependencies
 
-`forge-mcp` has zero external dependencies. All MCP transport and JSON-RPC 2.0
+`smeldr.dev/mcp` has zero external dependencies. All MCP transport and JSON-RPC 2.0
 protocol handling is implemented using the Go standard library only.
 
 ---

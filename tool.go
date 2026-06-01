@@ -124,6 +124,10 @@ func (s *Server) handleToolsList() any {
 	}
 	tools = append(tools, previewToolDefs()...)
 	tools = append(tools, uploadToolDefs()...)
+	if s.blockRepo != nil {
+		tools = append(tools, nodeToolDefs()...)
+		tools = append(tools, compositionToolDefs()...)
+	}
 	return map[string]any{"tools": tools}
 }
 
@@ -199,6 +203,25 @@ func (s *Server) handleToolsCall(ctx smeldr.Context, params json.RawMessage) (an
 			return nil, rpcErr
 		}
 		return s.handleUploadTool(s.app, p.Name)
+	}
+
+	// Block-system tools (WithBlocks). Generic node lifecycle tools require
+	// Author role; composition tools require Editor role. Dispatched before
+	// module-scoped tool authorisation so they cannot be shadowed by a content
+	// type whose name collides with "node".
+	if s.blockRepo != nil {
+		if isNodeTool(p.Name) {
+			if rpcErr := s.authorise(ctx); rpcErr != nil {
+				return nil, rpcErr
+			}
+			return s.handleNodeTool(ctx, p.Name, coalesceArgs(p.Arguments))
+		}
+		if isCompositionTool(p.Name) {
+			if rpcErr := s.authoriseEditor(ctx); rpcErr != nil {
+				return nil, rpcErr
+			}
+			return s.handleCompositionTool(ctx, p.Name, coalesceArgs(p.Arguments))
+		}
 	}
 
 	if rpcErr := s.authorise(ctx); rpcErr != nil {

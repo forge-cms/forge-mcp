@@ -7,6 +7,46 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.14.0] — 2026-06-01
+
+Block-system generic MCP tools (T32 component 3, Amendment A117). Dep bump: `smeldr.dev/core` v1.30.0 → v1.31.0, `smeldr.dev/oauth` v0.1.4 → v0.1.5.
+
+### Added
+
+- `WithBlocks() ServerOption` — enables the block-system tools, constructing a
+  `DynamicNode` repository and a `ContentEdgeStore` from the App's `Config.DB`.
+- Generic node tools (Author role): `create_node`, `update_node`, `get_node`,
+  `list_nodes`, `publish_node`, `archive_node`. Blocks are addressed by ID and are
+  not exposed as MCP resources.
+- Composition tools (Editor role): `add_section`, `reorder_sections`,
+  `remove_section`, `add_item`, `reorder_items`, `remove_item`. `add_*` derives
+  the parent and child types from the stored blocks.
+
+---
+
+## [1.13.0] — 2026-05-29
+
+### Added
+
+- `Server.Register(app *smeldr.App)` — mounts all MCP and OAuth routes on the Forge
+  App in one call, replacing per-endpoint `app.Handle` wiring. `Handler()` is
+  unchanged for non-Forge embeddings (Amendment A115, T58).
+
+## [1.12.0] — 2026-05-28
+
+### Changed
+
+- Package and module rename `forge` → `smeldr`: import path is `smeldr.dev/mcp`,
+  built against `smeldr.dev/core`. Tool names and behaviour unchanged
+  (Amendment A107, T62).
+
+## [1.11.3] — 2026-05-27
+
+### Changed
+
+- `go.mod` require blocks updated for the T59 Phase 2.4 module retagging. No code
+  or behaviour change.
+
 ## [1.11.2] — 2026-05-25
 
 Handle `POST /mcp` for MCP 2025-11-25 streamable HTTP transport.

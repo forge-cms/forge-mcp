@@ -51,6 +51,31 @@ func WithForgeFallback() ServerOption {
 	return func(s *Server) { s.forgeFallback = true }
 }
 
+// WithBlocks enables the block-system MCP tools for the App's DB.
+//
+// It exposes two tool groups (see block-system.md, T32):
+//   - Generic node lifecycle: create_node, update_node, get_node, list_nodes,
+//     publish_node, archive_node — operate on DynamicNode (Author role).
+//   - Composition: add_section / reorder_sections / remove_section and
+//     add_item / reorder_items / remove_item — operate on content edges
+//     (Editor role).
+//
+// The tools read and write the smeldr_dynamic_content and smeldr_content_edges
+// tables; create them once at startup with [smeldr.CreateBlockTables]. WithBlocks
+// reads the App's configured DB (Config.DB); if the App has no DB, the block
+// tools are silently not exposed.
+//
+//	smeldr.CreateBlockTables(db)
+//	mcpSrv := forgemcp.New(app, forgemcp.WithBlocks())
+func WithBlocks() ServerOption {
+	return func(s *Server) {
+		if db := s.app.Config().DB; db != nil {
+			s.blockRepo = smeldr.NewDynamicContentRepo(db)
+			s.edgeStore = smeldr.NewContentEdgeStore(db)
+		}
+	}
+}
+
 // WithOAuth enables OAuth 2.1 authentication for the MCP server.
 // The provided forge-oauth [forgeoauth.Server] handles authorization and token
 // issuance; all MCP requests (both GET /mcp SSE and POST /mcp/message) must
@@ -93,6 +118,11 @@ type Server struct {
 	subscriptions *subscriptionRegistry // resource subscription fan-out registry
 	oauth         *forgeoauth.Server    // non-nil when OAuth 2.1 is enabled via WithOAuth
 	forgeFallback bool                  // accept forge bearer tokens as fallback when OAuth enabled
+
+	// blockRepo and edgeStore are non-nil when WithBlocks is set; they back the
+	// block-system node and composition tools.
+	blockRepo *smeldr.SQLRepo[*smeldr.DynamicNode]
+	edgeStore *smeldr.ContentEdgeStore
 }
 
 // New creates a Server for the given forge App, collecting all content modules
