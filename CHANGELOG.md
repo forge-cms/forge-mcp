@@ -1,4 +1,4 @@
-# Changelog — forge-mcp
+# Changelog — smeldr.dev/mcp
 
 All notable changes to the `forge-mcp` module are documented here.
 

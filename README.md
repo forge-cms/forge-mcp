@@ -285,7 +285,7 @@ access. Do not expose the MCP binary's stdin to untrusted processes.
   authentication succeeded, authorisation failed)
 - All `tools/call` operations require `smeldr.Author` role or above
 
-Tokens are minted and verified using the same HMAC mechanism as the Forge REST
+Tokens are minted and verified using the same HMAC mechanism as the Smeldr REST
 API (`smeldr.BearerHMAC`). A token from `smeldr.SignToken(user, secret, 0)` is
 valid for both the REST API and the SSE MCP transport — there is no separate
 token format.
